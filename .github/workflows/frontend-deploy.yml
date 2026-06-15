@@ -47,13 +47,20 @@ jobs:
           docker push $IMAGE_URI
           echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
 
-      # - name: Configure kubectl for EKS
-      #   run: |
-      #     aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+      
+      - name: Update Kubernetes deployment manifest with new image
+        run: |
+          IMAGE_URI=${{ steps.build-image.outputs.image }}
+          yq e '.spec.template.spec.containers[0].image = "'"$IMAGE_URI"'"' -i k8s/frontend-deployment.yaml
 
-      # - name: Deploy frontend to EKS
-      #   run: |
-      #     kubectl set image deployment/frontend-deployment \
-      #       frontend-container=${{ steps.build-image.outputs.image }} \
-      #       -n "$K8_NAMESPACE"
-      #     kubectl rollout status deployment/frontend-deployment -n "$K8_NAMESPACE"
+      - name: Commit and push changes
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          git add k8s/frontend-deployment.yaml
+          
+          git commit -m "ci: update frontend image tag to ${{ github.sha }}"
+          
+          git push
+

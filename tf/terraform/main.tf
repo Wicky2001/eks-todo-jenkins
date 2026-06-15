@@ -740,10 +740,11 @@ resource "terraform_data" "patch_argocd_service" {
 
 
 resource "kubectl_manifest" "app_deployment" {
-  yaml_body = file("${path.module}/../k8s/argocd-app.yaml")
+  yaml_body = file("${path.module}/../../k8s/argocd-app.yaml")
 
   depends_on = [kubectl_manifest.argocd]
 }
+
 
 
 ###############################################################################

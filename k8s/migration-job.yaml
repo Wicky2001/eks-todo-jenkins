@@ -3,6 +3,7 @@ kind: Job
 
 metadata:
   name: migrate-db
+  namespace: app
 
 spec:
   backoffLimit: 1
