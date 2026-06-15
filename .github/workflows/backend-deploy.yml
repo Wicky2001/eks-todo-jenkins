@@ -42,13 +42,13 @@ jobs:
           docker push $IMAGE_URI
           echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
 
-      - name: Configure kubectl for EKS
-        run: |
-          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+      # - name: Configure kubectl for EKS
+      #   run: |
+      #     aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
 
-      - name: Deploy backend to EKS
-        run: |
-          kubectl set image deployment/backend-deployment \
-            backend-container=${{ steps.build-image.outputs.image }} \
-            -n "$K8_NAMESPACE"
-          kubectl rollout status deployment/backend-deployment -n "$K8_NAMESPACE"
+      # - name: Deploy backend to EKS
+      #   run: |
+      #     kubectl set image deployment/backend-deployment \
+      #       backend-container=${{ steps.build-image.outputs.image }} \
+      #       -n "$K8_NAMESPACE"
+      #     kubectl rollout status deployment/backend-deployment -n "$K8_NAMESPACE"

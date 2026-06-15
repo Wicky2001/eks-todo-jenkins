@@ -1,6 +1,3 @@
-
-
-
 ###############################################################################
 # Provider
 ###############################################################################
@@ -28,6 +25,15 @@ terraform {
     kubectl = {
       source  = "gavinbunney/kubectl"
       version = "~> 1.14"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 3.0.0"
+    }
+
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.5.0"
     }
   }
 }
@@ -67,6 +73,17 @@ data "aws_ecrpublic_authorization_token" "token" {
 }
 
 
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+  }
+}
 
 /*
 Teach helm how to log in to the EKS cluster
@@ -622,7 +639,7 @@ resource "kubectl_manifest" "karpenter_node_class" {
 ###############################################################################
 # Inflate deployment
 ###############################################################################
-resource "kubectl_manifest" "karpenter_example_deployment" {
+resource "kubectl_manifest" "inflate_deployment" {
   yaml_body = <<-YAML
     apiVersion: apps/v1
     kind: Deployment
@@ -674,26 +691,80 @@ resource "aws_ecr_repository" "migration" {
 
 
 
+###############################################################################
+# argo cd
+###############################################################################
+resource "kubernetes_namespace_v1" "argocd_namespace" {
+  metadata {
+    name = "argocd"
+  }
+
+  depends_on = [module.eks]
+}
+
+data "http" "argocd_manifest" {
+  url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
+}
+
+/*
+  install argo cd controller
+*/
+resource "kubectl_manifest" "argocd" {
+  for_each = { for doc in split("---", data.http.argocd_manifest.response_body) :
+    sha256(doc) => doc if trimspace(doc) != ""
+  }
+
+  yaml_body          = each.value
+  override_namespace = "argocd"
+
+  depends_on = [kubernetes_namespace_v1.argocd_namespace, helm_release.karpenter, kubectl_manifest.karpenter_node_class, kubectl_manifest.karpenter_node_pool]
+}
+
+# Patch ArgoCD server service to LoadBalancer
+resource "terraform_data" "patch_argocd_service" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Update kubeconfig first
+      aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}
+      
+      # Wait a bit for service to be created
+      sleep 20
+      
+      # Patch service to LoadBalancer (ignore errors if already patched)
+      kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}' || true
+    EOT
+  }
+
+  depends_on = [kubectl_manifest.argocd]
+}
+
+
+resource "kubectl_manifest" "app_deployment" {
+  yaml_body = file("${path.module}/../k8s/argocd-app.yaml")
+
+  depends_on = [kubectl_manifest.argocd]
+}
+
 
 ###############################################################################
 # 1. Create a Security Group specifically for the Backend Pod
 ###############################################################################
-resource "aws_security_group" "backend_pod_sg" {
-  name        = "${var.cluster_name}-backend-pod-sg"
-  description = "Security Group assigned directly to backend pods"
-  vpc_id      = module.vpc.vpc_id
+# resource "aws_security_group" "backend_pod_sg" {
+#   name        = "${var.cluster_name}-backend-pod-sg"
+#   description = "Security Group assigned directly to backend pods"
+#   vpc_id      = module.vpc.vpc_id
 
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
 
-  tags = {
-    Name = "${var.cluster_name}-backend-pod-sg"
-  }
-}
+#   tags = {
+#     Name = "${var.cluster_name}-backend-pod-sg"
+#   }
+# }
 
 
 
