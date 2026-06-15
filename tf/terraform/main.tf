@@ -476,11 +476,9 @@ resource "helm_release" "ingress-nginx" {
   namespace        = "ingress-nginx"
   create_namespace = true
   version          = "4.15.1"
-  values           = [file("../../k8s/helm-nginx-cofiguration.yaml")]
+  values           = [file("${path.module}/../../k8s/helm_config/helm-nginx-cofiguration.yaml")]
 
   depends_on = [helm_release.aws_load_balancer_controller]
-
-
 
 }
 
@@ -502,101 +500,7 @@ resource "helm_release" "ingress-nginx" {
 
 
 resource "kubectl_manifest" "karpenter_node_pool" {
-  yaml_body = <<-YAML
-    apiVersion: karpenter.sh/v1
-    kind: NodePool
-    metadata:
-      name: default
-    spec:
-      template:
-        spec:
-          nodeClassRef:
-            group: karpenter.k8s.aws
-            kind: EC2NodeClass
-            name: default
-
-          requirements:
-            # ------------------------------------------------------------------
-            # INSTANCE CATEGORY FILTER
-            # ------------------------------------------------------------------
-            # This selects the "family" of EC2 instances.
-            # Example families: t (burstable), c (compute), r (memory)
-            #
-            # We use "t" because:
-            # - It is burstable (cheap)
-            # - Good for dev / low-cost workloads
-            # - Often eligible for Free Tier
-            #
-            # IMPORTANT: This does NOT mean "only t2 or t3"
-            # It means ANY instance family starting with "t"
-            # ------------------------------------------------------------------
-            - key: "karpenter.k8s.aws/instance-category"
-              operator: In
-              values: ["t"]
-
-
-            # ------------------------------------------------------------------
-            # INSTANCE CPU FILTER
-            # ------------------------------------------------------------------
-            # Controls how many vCPUs the instance can have
-            #
-            # We restrict it to small sizes:
-            # - 1 vCPU (very small)
-            # - 2 vCPU (micro / small instances)
-            #
-            # Why:
-            # Prevent Karpenter from choosing large expensive instances
-            # like t3.large, t3.xlarge, etc.
-            # ------------------------------------------------------------------
-            - key: "karpenter.k8s.aws/instance-cpu"
-              operator: In
-              values: ["1", "2"]
-
-            # ------------------------------------------------------------------
-            # INSTANCE GENERATION FILTER
-            # ------------------------------------------------------------------
-            # Controls how new the hardware generation must be
-            #
-            # Gte "2" means:
-            # - Allow generation 2 and above
-            # - Reject very old instance families (gen 1)
-            #
-            # Why:
-            # - Better performance
-            # - Better efficiency
-            # - Avoid outdated hardware
-            # ------------------------------------------------------------------
-            - key: "karpenter.k8s.aws/instance-generation"
-              operator: Gte
-              values: ["2"]
-
-            - key: kubernetes.io/arch
-              operator: In
-              values: ["amd64"]
-
-      # ----------------------------------------------------------------------
-      # NODE CAPACITY LIMIT
-      # ----------------------------------------------------------------------
-      # Maximum CPU Karpenter is allowed to provision in total
-      # (cluster-wide for this NodePool)
-      # ----------------------------------------------------------------------
-      limits:
-        cpu: 1000
-
-      # ----------------------------------------------------------------------
-      # DISRUPTION SETTINGS (NODE CONSOLIDATION)
-      # ----------------------------------------------------------------------
-      # WhenEmpty:
-      # - Removes nodes only when they have no pods
-      #
-      # consolidateAfter: 30s
-      # - Waits 30 seconds before consolidating nodes
-      # ----------------------------------------------------------------------
-      disruption:
-        consolidationPolicy: WhenEmpty
-        consolidateAfter: 30s
-
-  YAML
+  yaml_body = file("${path.module}/../../k8s/karpenter/karpenter-node-pool.yaml")
 
   depends_on = [
     kubectl_manifest.karpenter_node_class
@@ -608,28 +512,7 @@ resource "kubectl_manifest" "karpenter_node_pool" {
 # Apply Karpenter NodeClass YAML via kubectl provider
 ###############################################################################
 resource "kubectl_manifest" "karpenter_node_class" {
-  yaml_body = <<-YAML
-    apiVersion: karpenter.k8s.aws/v1
-    kind: EC2NodeClass
-    metadata:
-      name: default
-    spec:
-      amiFamily: AL2023
-      role: ${module.karpenter.node_iam_role_name}
-      amiSelectorTerms:
-        - alias: al2023@latest
-      subnetSelectorTerms:
-        - tags:
-            karpenter.sh/discovery: ${module.eks.cluster_name}
-      securityGroupSelectorTerms:
-        - tags:
-            karpenter.sh/discovery: ${module.eks.cluster_name}
-      tags:
-        karpenter.sh/discovery: ${module.eks.cluster_name}
-  YAML
-
-
-
+  yaml_body = file("${path.module}/../../k8s/karpenter/karpenter-node-class.yaml")
 
   depends_on = [
     helm_release.karpenter
@@ -640,32 +523,11 @@ resource "kubectl_manifest" "karpenter_node_class" {
 # Inflate deployment
 ###############################################################################
 resource "kubectl_manifest" "inflate_deployment" {
-  yaml_body = <<-YAML
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: inflate
-    spec:
-      replicas: 0
-      selector:
-        matchLabels:
-          app: inflate
-      template:
-        metadata:
-          labels:
-            app: inflate
-        spec:
-          terminationGracePeriodSeconds: 0
-          containers:
-            - name: inflate
-              image: public.ecr.aws/eks-distro/kubernetes/pause:3.7
-              resources:
-                requests:
-                  cpu: 1
-  YAML
+  yaml_body = file("${path.module}/../../k8s/inflate/inflate-deployment.yaml")
+
 
   depends_on = [
-    helm_release.karpenter
+    kubectl_manifest.karpenter_node_pool
   ]
 }
 
@@ -694,6 +556,16 @@ resource "aws_ecr_repository" "migration" {
 ###############################################################################
 # argo cd
 ###############################################################################
+
+resource "kubernetes_namespace_v1" "app_namespace" {
+  metadata {
+    name = "app"
+  }
+
+  depends_on = [module.eks]
+}
+
+
 resource "kubernetes_namespace_v1" "argocd_namespace" {
   metadata {
     name = "argocd"
@@ -744,10 +616,17 @@ resource "terraform_data" "patch_argocd_service" {
 }
 
 
-resource "kubectl_manifest" "app_deployment" {
-  yaml_body = file("${path.module}/../../k8s/argocd-app.yaml")
 
-  depends_on = [kubectl_manifest.argocd]
+resource "kubectl_manifest" "argocd_project" {
+  yaml_body = file("${path.module}/../../k8s/argocd/argocd-project.yaml")
+
+  depends_on = [kubernetes_namespace_v1.app_namespace, kubectl_manifest.argocd]
+}
+
+resource "kubectl_manifest" "argocd_application" {
+  yaml_body = file("${path.module}/../../k8s/argocd/argocd-app.yaml")
+
+  depends_on = [kubernetes_namespace_v1.app_namespace, kubectl_manifest.argocd_project]
 }
 
 

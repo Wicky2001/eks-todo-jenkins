@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/Wicky2001/eks-todo.git
     targetRevision: main
-    path: k8s
+    path: k8s/app
   destination:
     server: https://kubernetes.default.svc
     namespace: app
