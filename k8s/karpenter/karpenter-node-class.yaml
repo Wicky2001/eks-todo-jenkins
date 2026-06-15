@@ -4,14 +4,14 @@ metadata:
   name: default
 spec:
   amiFamily: AL2023
-  role: ${module.karpenter.node_iam_role_name}
+  role: ${role_name}
   amiSelectorTerms:
     - alias: al2023@latest
   subnetSelectorTerms:
     - tags:
-        karpenter.sh/discovery: ${module.eks.cluster_name}
+        karpenter.sh/discovery: ${cluster_name}
   securityGroupSelectorTerms:
     - tags:
-        karpenter.sh/discovery: ${module.eks.cluster_name}
+        karpenter.sh/discovery: ${cluster_name}
   tags:
-    karpenter.sh/discovery: ${module.eks.cluster_name}
+    karpenter.sh/discovery: ${cluster_name}

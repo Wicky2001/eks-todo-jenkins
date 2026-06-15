@@ -512,8 +512,10 @@ resource "kubectl_manifest" "karpenter_node_pool" {
 # Apply Karpenter NodeClass YAML via kubectl provider
 ###############################################################################
 resource "kubectl_manifest" "karpenter_node_class" {
-  yaml_body = file("${path.module}/../../k8s/karpenter/karpenter-node-class.yaml")
-
+  yaml_body = templatefile("${path.module}/../../k8s/karpenter/karpenter-node-class.yaml", {
+    cluster_name = module.eks.cluster_name
+    role_name    = module.karpenter.node_iam_role_name
+  })
   depends_on = [
     helm_release.karpenter
   ]
