@@ -11,6 +11,10 @@ spec:
     - protocol: TCP
       port: 8080
       targetPort: 8080
+  template:
+    spec:
+      containers:
+        - image: 078238935484.dkr.ecr.ap-south-1.amazonaws.com/eks-todo-frontend:0b831fb0a7ec2339d61c269142a14624cf48025c
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -31,5 +35,5 @@ spec:
         - name: frontend-container
           ports:
             - containerPort: 8080
-          image: 078238935484.dkr.ecr.ap-south-1.amazonaws.com/eks-todo-frontend:10ff22e6534924dc6cd369446f945743d59fd740
+          image: 078238935484.dkr.ecr.ap-south-1.amazonaws.com/eks-todo-frontend:0b831fb0a7ec2339d61c269142a14624cf48025c
           imagePullPolicy: Always
