@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config-map
+  namespace: app
+data:
+  PORT: "8081"
+  CORS_ORIGINS: "http://k8s-ingressn-ingressn-27d0ca42bf-1d8773ea924904a8.elb.ap-south-1.amazonaws.com"

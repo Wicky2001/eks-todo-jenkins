@@ -716,22 +716,27 @@ resource "kubectl_manifest" "argocd" {
 
   yaml_body          = each.value
   override_namespace = "argocd"
+  server_side_apply  = true
+  force_conflicts    = true
 
-  depends_on = [kubernetes_namespace_v1.argocd_namespace, helm_release.karpenter, kubectl_manifest.karpenter_node_class, kubectl_manifest.karpenter_node_pool]
+
+  depends_on = [kubernetes_namespace_v1.argocd_namespace, kubectl_manifest.karpenter_node_class]
 }
 
 # Patch ArgoCD server service to LoadBalancer
 resource "terraform_data" "patch_argocd_service" {
   provisioner "local-exec" {
+    interpreter = ["PowerShell", "-Command"]
+
     command = <<-EOT
       # Update kubeconfig first
       aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}
       
       # Wait a bit for service to be created
-      sleep 20
+      Start-Sleep -Seconds 20
       
-      # Patch service to LoadBalancer (ignore errors if already patched)
-      kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}' || true
+      # Patch service to LoadBalancer (escaped double quotes for PowerShell to pass to kubectl safely)
+      kubectl patch svc argocd-server -n argocd -p '{\"spec\": {\"type\": \"LoadBalancer\"}}'
     EOT
   }
 
@@ -744,6 +749,37 @@ resource "kubectl_manifest" "app_deployment" {
 
   depends_on = [kubectl_manifest.argocd]
 }
+
+
+
+
+
+
+resource "helm_release" "sealed_secrets" {
+  name             = "sealed-secrets"
+  chart            = "https://github.com/bitnami-labs/sealed-secrets/releases/download/helm-v2.15.3/sealed-secrets-2.15.3.tgz"
+  namespace        = "kube-system"
+  create_namespace = false
+
+  values = [
+    yamlencode({
+      fullnameOverride = "sealed-secrets-controller"
+
+      tolerations = [
+        {
+          key      = "CriticalAddonsOnly"
+          operator = "Exists"
+          effect   = "NoSchedule"
+        }
+      ]
+    })
+  ]
+
+
+  depends_on = [module.eks]
+
+}
+
 
 
 
