@@ -254,11 +254,11 @@ module "eks" {
     karpenter = {
       # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["t3.micro"]
+      instance_types = ["c7i.large"]
 
       min_size     = 2
-      max_size     = 10
-      desired_size = 3
+      max_size     = 3
+      desired_size = 1
 
       taints = {
         # This Taint aims to keep just EKS Addons and Karpenter running on this MNG
@@ -483,21 +483,6 @@ resource "helm_release" "ingress-nginx" {
 }
 
 
-# resource "helm_release" "ingress-nginx" {
-#   name             = "ingress-nginx"
-#   repository       = "oci://ghcr.io/nginx/charts/nginx-ingress"
-#   chart            = "ingress-nginx"
-#   namespace        = "ingress-nginx"
-#   create_namespace = true
-#   version          = "2.6.0"
-#   values           = [file("../../k8s/helm-nginx-cofiguration.yaml")]
-
-#   depends_on = [helm_release.aws_load_balancer_controller]
-
-
-
-# }
-
 
 resource "kubectl_manifest" "karpenter_node_pool" {
   yaml_body = file("${path.module}/../../k8s/karpenter/karpenter-node-pool.yaml")
@@ -594,7 +579,7 @@ resource "kubectl_manifest" "argocd" {
   force_conflicts    = true
 
 
-  depends_on = [kubernetes_namespace_v1.argocd_namespace, kubectl_manifest.karpenter_node_class]
+  depends_on = [kubernetes_namespace_v1.argocd_namespace, kubectl_manifest.karpenter_node_pool]
 }
 
 # Patch ArgoCD server service to LoadBalancer
@@ -632,9 +617,38 @@ resource "kubectl_manifest" "argocd_application" {
 }
 
 
+###############################################################################
+# Install prometheus stack via helm
+###############################################################################
+resource "helm_release" "prometheus" {
+  name       = "prometheus"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  namespace  = "monitoring"
+  version    = "87.5.0"
 
+  create_namespace = true
 
+  # values = [
+  #   yamlencode({
+  #     prometheus-node-exporter = {
+  #       tolerations = [
+  #         {
+  #           key      = "CriticalAddonsOnly"
+  #           operator = "Exists"
+  #           effect   = "NoSchedule"
+  #         }
+  #       ]
+  #     }
+  #   })
+  # ]
 
+  depends_on = [module.eks]
+}
+
+###############################################################################
+# Install Sealed Secrets Controller via helm
+###############################################################################
 
 resource "helm_release" "sealed_secrets" {
   name             = "sealed-secrets"
