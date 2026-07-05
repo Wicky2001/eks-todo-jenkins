@@ -227,11 +227,16 @@ module "eks" {
 
 
   addons = {
-    coredns = {}
+    coredns = {
+      most_recent = true
+    }
     eks-pod-identity-agent = {
       before_compute = true
+      most_recent    = true
     }
-    kube-proxy = {}
+    kube-proxy = {
+      most_recent = true
+    }
 
     vpc-cni = {
       before_compute = true
@@ -242,6 +247,11 @@ module "eks" {
           WARM_PREFIX_TARGET       = "1"
         }
       })
+      most_recent = true
+    }
+
+    aws-ebs-csi-driver = {
+      most_recent = true
     }
 
   }
@@ -252,12 +262,15 @@ module "eks" {
 
   eks_managed_node_groups = {
     karpenter = {
+      iam_role_additional_policies = {
+        AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+      }
       # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
       ami_type       = "AL2023_x86_64_STANDARD"
-      instance_types = ["c7i.large"]
+      instance_types = ["c7i-flex.large"]
 
-      min_size     = 2
-      max_size     = 3
+      min_size     = 1
+      max_size     = 2
       desired_size = 1
 
       taints = {
@@ -321,8 +334,10 @@ module "karpenter" {
   create_pod_identity_association = true
 
   # Attach additional IAM policies to the Karpenter node IAM role
+  # When you add the policy to node_iam_role_additional_policies in Terraform, you are configuring the Worker Node's identity, not the Karpenter controller's identity.
   node_iam_role_additional_policies = {
-    AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+    AmazonEBSCSIDriverPolicy     = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
   }
 }
 
@@ -583,24 +598,24 @@ resource "kubectl_manifest" "argocd" {
 }
 
 # Patch ArgoCD server service to LoadBalancer
-resource "terraform_data" "patch_argocd_service" {
-  provisioner "local-exec" {
-    interpreter = ["PowerShell", "-Command"]
+# resource "terraform_data" "patch_argocd_service" {
+#   provisioner "local-exec" {
+#     interpreter = ["PowerShell", "-Command"]
 
-    command = <<-EOT
-      # Update kubeconfig first
-      aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}
-      
-      # Wait a bit for service to be created
-      Start-Sleep -Seconds 20
-      
-      # Patch service to LoadBalancer (escaped double quotes for PowerShell to pass to kubectl safely)
-      kubectl patch svc argocd-server -n argocd -p '{\"spec\": {\"type\": \"LoadBalancer\"}}'
-    EOT
-  }
+#     command = <<-EOT
+#       # Update kubeconfig first
+#       aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}
 
-  depends_on = [kubectl_manifest.argocd]
-}
+#       # Wait a bit for service to be created
+#       Start-Sleep -Seconds 20
+
+#       # Patch service to LoadBalancer (escaped double quotes for PowerShell to pass to kubectl safely)
+#       kubectl patch svc argocd-server -n argocd -p '{\"spec\": {\"type\": \"LoadBalancer\"}}'
+#     EOT
+#   }
+
+#   depends_on = [kubectl_manifest.argocd]
+# }
 
 
 
@@ -629,21 +644,21 @@ resource "helm_release" "prometheus" {
 
   create_namespace = true
 
-  # values = [
-  #   yamlencode({
-  #     prometheus-node-exporter = {
-  #       tolerations = [
-  #         {
-  #           key      = "CriticalAddonsOnly"
-  #           operator = "Exists"
-  #           effect   = "NoSchedule"
-  #         }
-  #       ]
-  #     }
-  #   })
-  # ]
+  values = [
+    yamlencode({
+      prometheus-node-exporter = {
+        tolerations = [
+          {
+            key    = "CriticalAddonsOnly"
+            value  = "true"
+            effect = "NoSchedule"
+          }
+        ]
+      }
+    })
+  ]
 
-  depends_on = [module.eks]
+  depends_on = [module.eks, kubectl_manifest.karpenter_node_pool]
 }
 
 ###############################################################################
