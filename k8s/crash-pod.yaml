@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: crash-demo
+  namespace: default
+
+spec:
+  restartPolicy: Always
+
+  containers:
+    - name: busybox
+      image: busybox:latest
+
+      command:
+        - sh
+        - -c
+        - |
+          echo "Application started"
+          sleep 20
+          echo "Application crashed"
+          exit 1

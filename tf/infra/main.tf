@@ -701,8 +701,15 @@ resource "kubectl_manifest" "argocd_application" {
 ###############################################################################
 
 # Apply storage classes for prometheus tsdb and alertmanager
+# 1. Read the multi-document YAML file and split it into individual manifests
+data "kubectl_file_documents" "storage_class_docs" {
+  content = file("${path.module}/../../k8s/observability/prometheus/storage_classes/values.yaml")
+}
+
+# 2. Loop through every split manifest block and apply them cleanly
 resource "kubectl_manifest" "prometheus_storage_classes" {
-  yaml_body = file("${path.module}/../../k8s/observability/prometheus/storage_classes/values.yaml")
+  for_each  = data.kubectl_file_documents.storage_class_docs.manifests
+  yaml_body = each.value
 
   depends_on = [module.eks]
 }

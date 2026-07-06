@@ -25,3 +25,4 @@ github-variables.txt
 backend-secret.yaml
 pub-cert.pem
 
+email-secrets.yml

@@ -54,6 +54,9 @@ alertmanager:
 # Configures the core Prometheus engine, containing the core Time Series Database (TSDB).
 prometheus:
   prometheusSpec:    
+    ruleSelector:
+      matchLabels:
+        release: monitoring
     # Instructs the Prometheus Operator to provision dedicated, permanent AWS storage 
     # for the TSDB data directory, ensuring your historical metrics survive pod lifecycle restarts.
     storageSpec: 

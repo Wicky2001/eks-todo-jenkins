@@ -1,0 +1,219 @@
+###############################################################################
+# IMPORTANT ARCHITECTURAL NOTE:
+# 1. This file goes inside PROMETHEUS, not Alertmanager.
+# 2. Prometheus reads this file to constantly evaluate mathematical expressions 
+#    against your cluster's metrics.
+# 3. If an expression evaluates to true (violates a rule), Prometheus generates 
+#    the alert and forwards it over the network to Alertmanager.
+###############################################################################
+
+# Specifies the API group and version for custom monitoring resources.
+# monitoring.coreos.com/v1 is the standard group provided by the Prometheus Operator.
+apiVersion: monitoring.coreos.com/v1
+
+# Tells Kubernetes that this file defines custom alert evaluation rules.
+kind: PrometheusRule
+
+# Standard Kubernetes metadata block to identify the resource.
+metadata:
+  # The unique name of this specific rule collection inside your cluster.
+  name: custom-alert-rules
+  
+  # The namespace where your Prometheus Operator is running.
+  namespace: monitoring
+  
+  # CRITICAL LABEL! If you installed Prometheus via Helm, the Prometheus Operator
+  # runs a background process that specifically filters for resources with this label.
+  # If 'release: monitoring' does NOT match your Helm chart release name, 
+  # Prometheus will silently ignore this entire file.
+  labels:
+    release: monitoring 
+
+# The specification block where you write your math rules and metrics targets.
+spec:
+  # A list of rule groups. Groups allow you to separate rules logically (e.g., app-rules vs infra-rules).
+  groups:
+  # The name of this particular logical group. 
+  - name: custom.rules
+    
+    # The actual list of alert conditions monitored within this group.
+    rules:
+    
+    # =========================================================================
+    # ALERT 1: HIGH CPU USAGE
+    # =========================================================================
+    # The identifier name of the alert. This name is what gets sent to Alertmanager.
+    - alert: HighCpuUsage
+    
+      # The mathematical condition written in PromQL (Prometheus Query Language).
+      # This calculates: 100 minus the average idle CPU time across instances over a 2-minute window.
+      # If the resulting CPU utilization percentage is greater than 50%, the rule triggers.
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 50
+
+      # -----------------------------------------------------------------------
+      # Mathematical breakdown:
+      #
+      # Step 1: Get only idle CPU counter values
+      #
+      # node_cpu_seconds_total{mode="idle"}
+      #
+      # Example CPU idle counter values:
+      #
+      # 2 minutes ago:
+      #   cpu0 idle counter = 10000
+      #
+      # Now:
+      #   cpu0 idle counter = 10060
+      #
+      #
+      # Step 2: Calculate rate over 2 minutes
+      #
+      # rate(node_cpu_seconds_total{mode="idle"}[2m])
+      #
+      # Formula:
+      #
+      #   rate = counter increase / time window seconds
+      #
+      # Example:
+      #
+      #   increase = 10060 - 10000
+      #            = 60 seconds
+      #
+      #   time window = 2 minutes
+      #               = 120 seconds
+      #
+      #   rate = 60 / 120
+      #        = 0.5
+      #
+      # Meaning:
+      #
+      #   CPU was idle 50% of the time
+      #
+      #
+      # Step 3: Calculate average idle percentage across CPU cores
+      #
+      # avg by(instance)(...)
+      #
+      # Example:
+      #
+      #   cpu0 idle rate = 0.5
+      #   cpu1 idle rate = 0.7
+      #   cpu2 idle rate = 0.6
+      #   cpu3 idle rate = 0.8
+      #
+      # Average:
+      #
+      #   (0.5 + 0.7 + 0.6 + 0.8) / 4
+      #
+      #   = 0.65
+      #
+      # Meaning:
+      #
+      #   Node average idle ratio = 0.65
+      #
+      #
+      # Step 4: Convert idle ratio into percentage
+      #
+      # avg_idle * 100
+      #
+      # Example:
+      #
+      #   0.65 * 100
+      #
+      #   = 65%
+      #
+      # Meaning:
+      #
+      #   Node is 65% idle
+      #
+      #
+      # Step 5: Convert idle percentage into CPU usage percentage
+      #
+      # Formula:
+      #
+      #   CPU usage = 100 - idle percentage
+      #
+      # Example:
+      #
+      #   CPU usage = 100 - 65
+      #
+      #             = 35%
+      #
+      #
+      # Step 6: Compare with alert threshold
+      #
+      # CPU usage > 50
+      #
+      # Example:
+      #
+      #   35 > 50
+      #
+      #   false
+      #
+      # Result:
+      #
+      #   No alert generated
+      #
+      #
+      # If another node:
+      #
+      #   idle = 20%
+      #
+      #   usage = 100 - 20
+      #         = 80%
+      #
+      #   80 > 50
+      #
+      #   true
+      #
+      # Result:
+      #
+      #   Prometheus creates HighCpuUsage alert for that instance
+      # -----------------------------------------------------------------------
+      
+      # The duration threshold. The CPU usage must continuously stay above 50% for 
+      # 5 full minutes before the alarm actually triggers. This prevents spamming 
+      # you during brief 5-second processing spikes.
+      for: 5m
+      
+      # Arbitrary metadata tags attached to the alert. 
+      labels:
+        # Alertmanager will read this 'severity' label to decide how to prioritize or route the message.
+        severity: warning
+        
+      # Information templates used to format the human-readable notification text.
+      annotations:
+        # The title of the alert. Go-templating {{ $labels.instance }} dynamically 
+        # injects the exact hostname or IP address of the breaking machine.
+        summary: "High CPU usage on instance {{ $labels.instance }}"
+        
+        # The detailed body text of the alert. {{ $value }} prints the exact mathematical 
+        # percentage calculated by the PromQL expression above.
+        description: "CPU usage is above 50% (current value: {{ $value }}%)"
+
+    # =========================================================================
+    # ALERT 2: POD RESTART
+    # =========================================================================
+    # The identifier name for your cluster's pod restart alarm.
+    - alert: PodRestart
+    
+      # The PromQL mathematical expression. It checks the total lifetime restart count 
+      # of containers. If any individual container hits 3 or more restarts, it triggers.
+      expr: kube_pod_container_status_restarts_total > 2
+      
+      # The duration threshold. Setting this to '0m' means the very second a container 
+      # records its 3rd restart, the alert fires instantly without waiting.
+      for: 0m
+      
+      # Extra metadata tags attached to this specific payload.
+      labels:
+        # Sets a higher priority label so you can filter it differently in Alertmanager.
+        severity: critical
+        
+      # Informational templates for your output notification message.
+      annotations:
+        # Title of the message, dynamically isolating the Kubernetes namespace where the failure happened.
+        summary: "Pod restart detected in namespace {{ $labels.namespace }}"
+        
+        # The detailed body of the email, injecting both the specific pod name and the total failure count.
+        description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times"

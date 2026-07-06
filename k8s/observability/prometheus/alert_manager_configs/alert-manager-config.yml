@@ -1,0 +1,96 @@
+###############################################################################
+# IMPORTANT ARCHITECTURAL NOTE:
+# 1. This file goes inside ALERTMANAGER, not Prometheus.
+# 2. Alertmanager ONLY handles routing, grouping, and sending notifications.
+# 3. Alertmanager DOES NOT watch your cluster or look for rule violations. 
+#    Prometheus does the mathematical watching, then passes alerts to this file.
+###############################################################################
+
+# Specifies the API group and version used to define this custom resource.
+# monitoring.coreos.com/v1alpha1 is provided by the Prometheus Operator.
+apiVersion: monitoring.coreos.com/v1alpha1
+
+# Tells Kubernetes that this file configures Alertmanager routing and receivers.
+kind: AlertmanagerConfig
+
+# Standard Kubernetes metadata metadata block to identify the resource.
+metadata:
+  # The unique name of this specific alert configuration object within your cluster.
+  name: main-rules-alert-config
+  
+  # The namespace where your monitoring stack lives. Must match where Alertmanager runs.
+  namespace: monitoring
+  
+  # Essential label! The Prometheus Operator uses this tag to discover this config.
+  # If 'release: monitoring' doesn't match your Helm chart release name, it will be ignored.
+  labels:
+    release: monitoring
+
+# The specification block where you define how incoming alerts are processed.
+spec:
+  # The root routing tree. Every alert sent by Prometheus enters here first.
+  route:
+    # Fallback timer. If an alert keeps firing, wait 30 minutes before spamming another email.
+    repeatInterval: 30m
+    
+    # The default destination. If an incoming alert doesn't match any specific sub-rules below,
+    # it gets sent to the 'null' receiver (which silently discards/drops it).
+    receiver: 'null'
+    
+    # A list of specific sub-routing rules for filtering alerts based on their labels.
+    routes:
+    
+    # --- RULE 1: HIGH CPU USAGE ALERTS ---
+    - matchers:
+      # Checks if the incoming alert's name label matches exactly "HighCpuUsage"
+      - name: alertname
+        value: HighCpuUsage
+      # If it matches, forward this specific alert to the 'send-email' block defined below.
+      receiver: 'send-email'
+      
+    # --- RULE 2: POD RESTART ALERTS ---
+    - matchers:
+      # Checks if the incoming alert's name label matches exactly "PodRestart"
+      - name: alertname
+        value: PodRestart
+      # Forward this specific alert to the 'send-email' block.
+      receiver: 'send-email'
+      # Overrides the default 30m root timer. Because pod restarts are critical, 
+      # repeat the email alert every 5 minutes if the issue persists.
+      repeatInterval: 5m
+
+  # Defines the actual integration endpoints (destinations) where alerts are sent.
+  receivers:
+  # A custom receiver endpoint that handles dispatching email alerts.
+  - name: 'send-email'
+    # Configuration block specific to sending SMTP emails.
+    emailConfigs:
+    # The destination email address that will receive the alarm notifications.
+    - to: "wickram-cs20035@stu.kln.ac.lk"
+    
+      # The "Sender" address that will appear in the "From" header of the email.
+      from: "pmwickramaratna@gmail.com"
+      
+      # If true, it sends a "Resolved" email when the issue goes away. 
+      # Setting it to false means you only get notified when things break, not when they fix.
+      sendResolved: false
+      
+      # The network address and port of your email provider's SMTP server (Gmail TLS port is 587).
+      smarthost: smtp.gmail.com:587
+      
+      # The username (usually your email address) required to log in to the SMTP server.
+      authUsername: "pmwickramaratna@gmail.com"
+      
+      # Used for corporate mail relays. For regular Gmail setups, this matches your username.
+      authIdentity: "pmwickramaratna@gmail.com"
+      
+      # Securely fetches your password instead of writing it in plain text.
+      authPassword:
+        # Tells Alertmanager to go open a Kubernetes Secret named "mail-pass"
+        name: mail-pass
+        # Instructs it to read the value assigned to the key "gmail-pass" inside that secret.
+        key: gmail-pass
+
+  # A black hole receiver. Anything sent here is intentionally dropped.
+  # Used to mute unwanted alerts or act as a safe default fallback.
+  - name: 'null'

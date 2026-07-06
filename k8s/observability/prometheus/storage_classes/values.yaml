@@ -9,7 +9,9 @@ volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 parameters:
   type: gp3
-  additional-tags: "Name=prometheus-metrics-ebs,Project=EKS-Todo,Component=Metrics"
+  tagSpecification_1: "Name=prometheus-metrics-ebs"
+  tagSpecification_2: "Project=EKS-Todo"
+  tagSpecification_3: "Component=Metrics"
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -21,4 +23,6 @@ volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 parameters:
   type: gp3
-  additional-tags: "Name=alertmanager-alerts-ebs,Project=EKS-Todo,Component=Alerts"
+  tagSpecification_1: "Name=alertmanager-alerts-ebs"
+  tagSpecification_2: "Project=EKS-Todo"
+  tagSpecification_3: "Component=Metrics"
