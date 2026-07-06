@@ -1,0 +1,70 @@
+# ==============================================================================
+# 🔥 IMPORTANT PRE-REQUISITE STEP 🔥
+# Before deploying or upgrading this Prometheus Stack using Helm, you MUST 
+# create the required StorageClasses inside your Kubernetes cluster.
+#
+# Run this command first:
+#   kubectl apply -f monitoring-storageclasses.yaml
+#
+# Why? If you apply this Helm chart before creating those StorageClasses, 
+# your PersistentVolumeClaims (PVCs) will fail to discover the storage backend 
+# and will remain stuck in a 'Pending' state indefinitely.
+# ==============================================================================
+
+# ─── GRAFANA CONFIGURATION ──────────────────────────────────────────
+# Configures the global settings for the Grafana visual dashboard portal.
+grafana:
+  # Sets the initial admin dashboard password. (Change this for production!)
+  adminPassword: prom-operator
+
+# ─── ALERTMANAGER CONFIGURATION ──────────────────────────────────────
+# Configures the notification routing engine, which processes alerts sent by Prometheus.
+alertmanager:
+  alertmanagerSpec:
+    # Tells Alertmanager to scan the cluster and dynamically discover alert configurations 
+    # (kind: AlertmanagerConfig) that contain the matching label 'release: monitoring'.
+    alertmanagerConfigSelector:
+      matchLabels:
+        release: monitoring
+
+    # Spins up 2 separate Alertmanager pods. This provides high-availability (HA) redundancy;
+    # if one pod crashes or restarts, your alert notification routes won't drop dead.
+    replicas: 1
+
+    # Disables restrictive namespace matching. Setting this to 'None' allows Alertmanager 
+    # to receive and process alerting definitions globally from any namespace in the cluster.
+    alertmanagerConfigMatcherStrategy:
+      type: None
+
+    # Dynamically requests dedicated, independent persistent storage for the Alertmanager mesh 
+    # to prevent losing data like active alerts, silences, or configurations during a pod crash.
+    storage:
+      volumeClaimTemplate:
+        spec:
+          # Binds this request to your custom, beautifully-tagged alert storage layout.
+          storageClassName: alertmanager-alerts-sc
+          # Restricts the AWS EBS disk to be mounted and read/written by only 1 node at a time.
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              # Allocates a physical 10 Gigabyte AWS EBS disk per Alertmanager instance.
+              storage: 10Gi
+
+# ─── PROMETHEUS CONFIGURATION ────────────────────────────────────────
+# Configures the core Prometheus engine, containing the core Time Series Database (TSDB).
+prometheus:
+  prometheusSpec:    
+    # Instructs the Prometheus Operator to provision dedicated, permanent AWS storage 
+    # for the TSDB data directory, ensuring your historical metrics survive pod lifecycle restarts.
+    storageSpec: 
+      volumeClaimTemplate:
+        spec:
+          # Binds this request to your custom, high-performance gp3 metrics storage class.
+          storageClassName: prometheus-metrics-sc
+          # Restricts the AWS EBS disk to be mounted and read/written by only 1 node at a time.
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              # Allocates a physical 20 Gigabyte AWS EBS disk to hold your application metrics.
+              storage: 20Gi
+

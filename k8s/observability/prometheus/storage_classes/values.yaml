@@ -1,0 +1,24 @@
+# monitoring-storageclasses.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: prometheus-metrics-sc  
+
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  additional-tags: "Name=prometheus-metrics-ebs,Project=EKS-Todo,Component=Metrics"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: alertmanager-alerts-sc 
+
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  additional-tags: "Name=alertmanager-alerts-ebs,Project=EKS-Todo,Component=Alerts"

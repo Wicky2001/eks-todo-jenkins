@@ -635,6 +635,15 @@ resource "kubectl_manifest" "argocd_application" {
 ###############################################################################
 # Install prometheus stack via helm
 ###############################################################################
+
+# Apply storage classes for prometheus tsdb and alertmanager
+resource "kubectl_manifest" "prometheus_storage_classes" {
+  yaml_body = file("${path.module}/../../k8s/observability/prometheus/storage_classes/values.yaml")
+
+  depends_on = [module.eks]
+}
+
+
 resource "helm_release" "prometheus" {
   name       = "prometheus"
   repository = "https://prometheus-community.github.io/helm-charts"
@@ -645,6 +654,7 @@ resource "helm_release" "prometheus" {
   create_namespace = true
 
   values = [
+    file("${path.module}/../../k8s/observability/prometheus/infra_config.yaml"),
     yamlencode({
       prometheus-node-exporter = {
         tolerations = [
@@ -658,7 +668,7 @@ resource "helm_release" "prometheus" {
     })
   ]
 
-  depends_on = [module.eks, kubectl_manifest.karpenter_node_pool]
+  depends_on = [module.eks, kubectl_manifest.karpenter_node_pool, kubectl_manifest.prometheus_storage_classes]
 }
 
 ###############################################################################
