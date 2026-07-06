@@ -124,14 +124,7 @@ output "migration_ecr_repository_url" {
 }
 
 
-###############################################################################
-# AWS Load Balancer Controller
-###############################################################################
 
-output "aws_load_balancer_controller_role" {
-  description = "IAM Role ARN used by AWS Load Balancer Controller"
-  value       = module.iam_iam-role-for-service-accounts.arn
-}
 
 
 ###############################################################################

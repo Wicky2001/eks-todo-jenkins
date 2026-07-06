@@ -203,6 +203,70 @@ module "vpc" {
   }
 }
 
+
+###############################################################################
+# Pod Identity for AWS EBS CSI Driver
+###############################################################################
+
+module "aws_ebs_csi_pod_identity" {
+  source = "terraform-aws-modules/eks-pod-identity/aws"
+
+  # 1. This IS the name of the IAM role the module will automatically CREATE for you.
+  # It will show up in your AWS IAM Console as "aws-ebs-csi".
+  name = "${var.cluster_name}-aws-ebs-csi"
+
+  # 2. When set to true, the module automatically grabs the official AWS-managed policy
+  # "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy" 
+  # and attaches it to the role it just created. (Saves you from writing it yourself).
+  attach_aws_ebs_csi_policy = true
+
+  # 3. OPTIONAL: If you encrypt your EBS volumes using a custom AWS KMS Key, 
+  # the IAM role needs permission to use that key to decrypt/encrypt disks. 
+  # You put your KMS Key ARN here. (If using default AWS-managed EBS encryption, you can delete this line).
+  aws_ebs_csi_kms_arns = ["arn:aws:kms:*:*:key/1234abcd-12ab-34cd-56ef-1234567890ab"]
+
+  # 4. The map that tells the AWS EKS API to match the newly created "aws-ebs-csi" IAM role
+  # to the "ebs-csi-controller-sa" pod identifier inside your specific cluster.
+  associations = {
+    this = {
+      cluster_name    = var.cluster_name # Change "example" to match your cluster variable
+      namespace       = "kube-system"
+      service_account = "ebs-csi-controller-sa"
+    }
+  }
+
+  tags = {
+    Environment = "production"
+  }
+}
+
+###############################################################################
+# Pod Identity for AWS Load Balancer Controller
+###############################################################################
+
+module "aws_lb_controller_pod_identity" {
+  source = "terraform-aws-modules/eks-pod-identity/aws"
+
+  name = "aws-lbc"
+
+  attach_aws_lb_controller_policy = true
+
+  associations = {
+    this = {
+      cluster_name    = var.cluster_name
+      namespace       = "kube-system"
+      service_account = "aws-load-balancer-controller-sa"
+    }
+  }
+
+  tags = {
+    Environment = "dev"
+  }
+}
+
+
+
+
 ###############################################################################
 # EKS
 ###############################################################################
@@ -252,6 +316,7 @@ module "eks" {
 
     aws-ebs-csi-driver = {
       most_recent = true
+      depends_on  = [module.aws_ebs_csi_pod_identity]
     }
 
   }
@@ -262,9 +327,7 @@ module "eks" {
 
   eks_managed_node_groups = {
     karpenter = {
-      iam_role_additional_policies = {
-        AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-      }
+
       # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
       ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = ["c7i-flex.large"]
@@ -337,7 +400,6 @@ module "karpenter" {
   # When you add the policy to node_iam_role_additional_policies in Terraform, you are configuring the Worker Node's identity, not the Karpenter controller's identity.
   node_iam_role_additional_policies = {
     AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
-    AmazonEBSCSIDriverPolicy     = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
   }
 }
 
@@ -368,8 +430,11 @@ resource "helm_release" "karpenter" {
 */
   wait = false
 
+  # By default official, Karpeneter Helm chart automatically add CriticalAddonsOnly toleration to the Karpenter pods.
+
   values = [
     <<-EOT
+    replicas: 1
     serviceAccount:
       name: ${module.karpenter.service_account}
     settings:
@@ -411,21 +476,27 @@ resource "helm_release" "metrics_server" {
 }
 
 
-module "iam_iam-role-for-service-accounts" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
-  version = "6.6.1"
 
-  # Updated to match the v6.x variable list
-  name                                   = "${var.cluster_name}-aws-lbc"
-  attach_load_balancer_controller_policy = true
 
-  oidc_providers = {
-    main = {
-      provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
-    }
-  }
-}
+
+
+
+
+# module "iam_iam-role-for-service-accounts" {
+#   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
+#   version = "6.6.1"
+
+#   # Updated to match the v6.x variable list
+#   name                                   = "${var.cluster_name}-aws-lbc"
+#   attach_load_balancer_controller_policy = true
+
+#   oidc_providers = {
+#     main = {
+#       provider_arn               = module.eks.oidc_provider_arn
+#       namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
+#     }
+#   }
+# }
 
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
@@ -434,7 +505,7 @@ resource "helm_release" "aws_load_balancer_controller" {
   namespace  = "kube-system"
   version    = "1.7.2"
 
-  depends_on = [module.eks]
+
   values = [
     yamlencode({
       tolerations = [
@@ -456,10 +527,6 @@ resource "helm_release" "aws_load_balancer_controller" {
       value = var.region
     },
     {
-      name  = "serviceAccount.create"
-      value = "false"
-    },
-    {
       name  = "vpcId"
       value = module.vpc.vpc_id
     },
@@ -469,14 +536,11 @@ resource "helm_release" "aws_load_balancer_controller" {
     },
     {
       name  = "serviceAccount.name"
-      value = "aws-load-balancer-controller"
+      value = "aws-load-balancer-controller-sa"
     },
-    {
-      name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-      value = module.iam_iam-role-for-service-accounts.arn
-  }]
+  ]
 
-
+  depends_on = [module.eks, module.aws_lb_controller_pod_identity]
 
 }
 
