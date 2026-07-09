@@ -1,6 +1,7 @@
 const todoService = require('../services/todoService');
-import { AppError } from '../middleware/errorHandler.js';
-
+const {AppError} = require('../middleware/errorHandler');
+const pino = require('pino');
+const logger = pino();
 
 async function getTodos(_request, response, next) {
   try {
@@ -20,6 +21,7 @@ async function createTodo(request, response, next) {
     }
 
     const todo = await todoService.createTodo(title);
+    logger.info({ todo:todo }, 'Todo created successfully');
     response.status(201).json(todo);
   } catch (error) {
     next(error);
@@ -50,6 +52,7 @@ async function removeTodo(request, response, next) {
       throw new Error('Todo not found');
     }
 
+    logger.info({ todoId:request.params.id }, 'Todo removed successfully');
     response.status(204).send();
   } catch (error) {
     next(error);
