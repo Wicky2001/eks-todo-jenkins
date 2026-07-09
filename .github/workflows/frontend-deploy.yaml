@@ -54,7 +54,7 @@ jobs:
       - name: Update Kubernetes deployment manifest with new image
         run: |
           IMAGE_URI=${{ steps.build-image.outputs.image }}
-          yq e '.spec.template.spec.containers[0].image = "'"$IMAGE_URI"'"' -i k8s/frontend/deployment.yaml
+          yq e '.spec.template.spec.containers[0].image = "'"$IMAGE_URI"'"' -i k8s/app/frontend/deployment.yaml
 
       - name: Commit and push changes
         run: |
