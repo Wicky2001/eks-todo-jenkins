@@ -8,13 +8,16 @@ spec:
   sources:
     - repoURL: https://github.com/Wicky2001/eks-todo.git
       targetRevision: main
-      path: k8s/app
+      path: k8s/app/migration # Path 2
     - repoURL: https://github.com/Wicky2001/eks-todo.git
       targetRevision: main
       path: k8s/app/frontend # Path 1
     - repoURL: https://github.com/Wicky2001/eks-todo.git
       targetRevision: main
       path: k8s/app/backend
+    - repoURL: https://github.com/Wicky2001/eks-todo.git
+      targetRevision: main
+      path: k8s/app/ingress
   destination:
     server: https://kubernetes.default.svc
     namespace: app
