@@ -5,10 +5,16 @@ metadata:
   namespace: argocd
 spec:
   project: eks-todo-project
-  source:
-    repoURL: https://github.com/Wicky2001/eks-todo.git
-    targetRevision: main
-    path: k8s/app
+  sources:
+    - repoURL: https://github.com/Wicky2001/eks-todo.git
+      targetRevision: main
+      path: k8s/app
+    - repoURL: https://github.com/Wicky2001/eks-todo.git
+      targetRevision: main
+      path: k8s/app/frontend # Path 1
+    - repoURL: https://github.com/Wicky2001/eks-todo.git
+      targetRevision: main
+      path: k8s/app/backend
   destination:
     server: https://kubernetes.default.svc
     namespace: app
