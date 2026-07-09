@@ -1,4 +1,6 @@
 const todoService = require('../services/todoService');
+import { AppError } from '../middleware/errorHandler.js';
+
 
 async function getTodos(_request, response, next) {
   try {
@@ -14,8 +16,7 @@ async function createTodo(request, response, next) {
     const title = request.body?.title?.trim();
 
     if (!title) {
-      response.status(400);
-      throw new Error('Title is required');
+      throw new AppError('Title is required',400);
     }
 
     const todo = await todoService.createTodo(title);
