@@ -7,6 +7,7 @@ async function getTodos(_request, response, next) {
   try {
     const todos = await todoService.listTodos();
     response.json(todos);
+    logger.info({ todos:todos }, 'Todos retrieved successfully');
   } catch (error) {
     next(error);
   }

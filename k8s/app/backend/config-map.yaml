@@ -5,4 +5,4 @@ metadata:
   namespace: app
 data:
   PORT: "8081"
-  CORS_ORIGINS: "http://k8s-ingressn-ingressn-27d0ca42bf-1d8773ea924904a8.elb.ap-south-1.amazonaws.com"
+  CORS_ORIGINS: "http://k8s-ingressn-ingressn-ab943bd786-64a36ce7f7b32035.elb.ap-south-1.amazonaws.com"
