@@ -1,10 +1,8 @@
 apiVersion: batch/v1
 kind: Job
-
 metadata:
   name: migrate-db
   namespace: app
-
 spec:
   backoffLimit: 1
   template:
@@ -12,7 +10,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: migration
-          image: 915658834610.dkr.ecr.ap-south-1.amazonaws.com/jawsight/sequelizer:v3
+          image: ""
           envFrom:
             - secretRef:
                 name: backend-secret
