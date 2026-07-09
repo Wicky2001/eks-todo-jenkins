@@ -26,4 +26,6 @@ backend-secret.yaml
 pub-cert.pem
 
 email-secrets.yml
-secret.yaml
+secrets.yml
+secret.*
+secrets.*
