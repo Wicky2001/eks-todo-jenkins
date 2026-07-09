@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - mongoose/**
-      - .github/workflows/migration-deploy.yml
+      - .github/workflows/migration-job-deploy.yaml
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
