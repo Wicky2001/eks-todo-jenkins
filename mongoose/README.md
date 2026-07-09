@@ -8,4 +8,3 @@ Run migrations with:
 npm run migrate --workspace mongoose
 ```
 
-The runner reads `mongoose/.env` and expects `MONGODB_URI` to point at the local database.
