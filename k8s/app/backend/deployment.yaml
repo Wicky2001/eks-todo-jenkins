@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: backend-container
-          image: 078238935484.dkr.ecr.ap-south-1.amazonaws.com/eks-todo-backend:9f0298f681674b30521c63c42a9e46a279dead0b
+          image: 078238935484.dkr.ecr.ap-south-1.amazonaws.com/eks-todo-backend:a93eb2e32696d630f7f6a2fdd8e8f57230e1d2a9
           imagePullPolicy: Always
           ports:
             - containerPort: 8081
