@@ -63,7 +63,19 @@ app.use((req, res, next) => {
   res.on('finish',()=>{
     const duration = (Date.now() - start) / 1000; // Duration in seconds
     const {method,path} = req;
-  
+          /**
+         * ⚠️ PRODUCTION ARCHITECTURAL NOTE: HIGH CARDINALITY RISK ⚠️
+         * Passing raw paths (e.g., req.url) into metric labels is acceptable ONLY for 
+         * static, hardcoded routes (like '/healthy' or '/metrics'). 
+         * * If this application introduces dynamic paths containing unique identifiers 
+         * (e.g., '/user/1001' or '/item/sku-abc'), every unique ID will force Prometheus 
+         * to spin up a completely separate Time Series tracking row in memory. Under 
+         * high traffic, this will cause an exponential RAM spike and crash your 
+         * monitoring stack.
+         * * FIX FOR DYNAMIC ROUTES: You must sanitize/normalize the path string into a 
+         * structural template name (e.g., change '/user/1001' to '/user/:id') before 
+         * passing it into the labels object below.
+         */
     httpRequestCounter.labels({method,path,status_code:res.statusCode}).inc();
     requestDurationHistogram.labels({method,path,status_code:res.statusCode}).observe(duration);
     requestDurationSummary.labels({method,path,status_code:res.statusCode}).observe(duration);

@@ -1,0 +1,60 @@
+storage:
+  type: elasticsearch
+
+provisionDataStore:
+  cassandra: false
+  elasticsearch: false
+
+# The entire OpenTelemetry config goes under userconfig
+userconfig:
+  # 1. DECLARE ALL COMPONENTS
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+  processors:
+    batch:
+      timeout: 5s
+      send_batch_size: 1024
+
+  exporters:
+    jaeger_storage_exporter:
+      trace_storage: primary_store_elasticsearch
+
+  extensions:
+    healthcheckv2:
+      endpoint: 0.0.0.0:13133
+    jaeger_query:
+      storage:
+        traces: primary_store_elasticsearch
+    jaeger_storage:
+      backends:
+        primary_store_elasticsearch:
+          elasticsearch:
+            server_urls: ["https://elasticsearch-master.logging.svc.cluster.local:9200"]
+            tls:
+              insecure: true
+            auth:
+              basic:
+                username: elastic
+                password: Hzxwo4J2PMiWIcLt
+
+  # 2. WIRE THEM TOGETHER IN THE SERVICE
+  service:
+    # You MUST declare the extensions here to turn the UI and Database bridges on
+    extensions: [healthcheckv2,jaeger_query, jaeger_storage] 
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [jaeger_storage_exporter]
+        
+    # 3. INTERNAL LOGGING
+    telemetry:
+      logs:
+        level: debug
+        encoding: json
