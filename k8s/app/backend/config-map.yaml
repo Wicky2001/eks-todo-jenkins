@@ -8,4 +8,5 @@ data:
   CORS_ORIGINS: "http://k8s-ingressn-ingressn-ab943bd786-64a36ce7f7b32035.elb.ap-south-1.amazonaws.com"
   NODE_ENV: "production"
   OTEL_EXPORTER_JAEGER_ENDPOINT: "http://jaeger.tracing.svc.cluster.local:4318/v1/traces"
+  OTEL_LOG_LEVEL: "debug"
 

@@ -12,6 +12,7 @@ const {
 } = require("@opentelemetry/semantic-conventions");
 const { SimpleSpanProcessor } = require("@opentelemetry/sdk-trace-base");
 const { HttpInstrumentation } = require("@opentelemetry/instrumentation-http");
+const { MongoDBInstrumentation } = require("@opentelemetry/instrumentation-mongodb");
 const {
   ExpressInstrumentation,
 } = require("@opentelemetry/instrumentation-express");
@@ -49,6 +50,7 @@ try {
         },
       }),
       new ExpressInstrumentation(), // Add this for Express.js instrumentation
+      new MongoDBInstrumentation(),
     ],
   });
 
