@@ -4,7 +4,7 @@ const { diag, DiagConsoleLogger, DiagLogLevel } = require("@opentelemetry/api");
 const { NodeTracerProvider } = require("@opentelemetry/sdk-trace-node");
 const {OTLPTraceExporter} = require("@opentelemetry/exporter-trace-otlp-http");
 const { registerInstrumentations } = require("@opentelemetry/instrumentation");
-const { Resource } = require("@opentelemetry/resources");
+const { resourceFromAttributes } = require("@opentelemetry/resources");
 const {SemanticResourceAttributes} = require("@opentelemetry/semantic-conventions");
 const { SimpleSpanProcessor } = require("@opentelemetry/sdk-trace-base");
 const { HttpInstrumentation } = require("@opentelemetry/instrumentation-http");
@@ -20,7 +20,7 @@ if(process.env.NODE_ENV == "development") {
 
 
 try {
-  const resource = Resource.resourceFromAttributes({
+  const resource = resourceFromAttributes({
        "service.name": "todo-backend",
      });
   // create a exporter

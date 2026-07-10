@@ -1,8 +1,6 @@
 require("dotenv").config();
+require("./tracing");
 
-if (process.env.NODE_ENV == "production") {
-  require("./tracing");
-}
 
 const app = require("./app");
 const connectToDatabase = require("./config/db");
