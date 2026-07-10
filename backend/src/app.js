@@ -11,7 +11,6 @@ app.set("trust proxy", true);
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:8080';
 
 
-
 const whitelist = process.env.CORS_ORIGINS.split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);

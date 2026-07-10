@@ -9,4 +9,5 @@ data:
   NODE_ENV: "production"
   OTEL_EXPORTER_JAEGER_ENDPOINT: "http://jaeger.tracing.svc.cluster.local:4318/v1/traces"
   OTEL_LOG_LEVEL: "debug"
+  
 

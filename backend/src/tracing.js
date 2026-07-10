@@ -1,26 +1,28 @@
 "use strict";
-const { diag, DiagConsoleLogger, DiagLogLevel } = require("@opentelemetry/api");
-diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
 const pino = require("pino");
-const logger = pino();
+const { diag, DiagConsoleLogger, DiagLogLevel } = require("@opentelemetry/api");
 const { NodeTracerProvider } = require("@opentelemetry/sdk-trace-node");
-const {
-  OTLPTraceExporter,
-} = require("@opentelemetry/exporter-trace-otlp-http");
+const {OTLPTraceExporter} = require("@opentelemetry/exporter-trace-otlp-http");
 const { registerInstrumentations } = require("@opentelemetry/instrumentation");
 const { Resource } = require("@opentelemetry/resources");
-const {
-  SemanticResourceAttributes,
-} = require("@opentelemetry/semantic-conventions");
+const {SemanticResourceAttributes} = require("@opentelemetry/semantic-conventions");
 const { SimpleSpanProcessor } = require("@opentelemetry/sdk-trace-base");
 const { HttpInstrumentation } = require("@opentelemetry/instrumentation-http");
 const { MongoDBInstrumentation } = require("@opentelemetry/instrumentation-mongodb");
-const {
-  ExpressInstrumentation,
-} = require("@opentelemetry/instrumentation-express");
+const {ExpressInstrumentation} = require("@opentelemetry/instrumentation-express");
+
+
+const logger = pino();
+
+if(process.env.NODE_ENV == "development") {
+  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
+}
+
 
 try {
- 
+  const resource = Resource.resourceFromAttributes({
+       "service.name": "todo-backend",
+     });
   // create a exporter
   const collector_endpoint = process.env.OTEL_EXPORTER_JAEGER_ENDPOINT;
 
@@ -35,6 +37,7 @@ try {
 
   // Add a span processor to the provider
   const provider = new NodeTracerProvider({
+  resource: resource,
   spanProcessors: [
     new SimpleSpanProcessor(exporter)
   ]
@@ -43,6 +46,7 @@ try {
   // Initialize the provider and instrumentations
   provider.register();
 
+  // Automatic instrumentation for HTTP, Express, and MongoDB
   registerInstrumentations({
     instrumentations: [
       new HttpInstrumentation({
@@ -50,7 +54,7 @@ try {
           span.setAttribute("custom-attribute", "custom-value");
         },
       }),
-      new ExpressInstrumentation(), // Add this for Express.js instrumentation
+      new ExpressInstrumentation(), 
       new MongoDBInstrumentation(),
     ],
   });
