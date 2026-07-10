@@ -10,7 +10,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: migration
-          image: ""
+          image: "078238935484.dkr.ecr.ap-south-1.amazonaws.com/eks-todo-migration:46fcca4169d6b9c5f27eab48b75dec20f81ba7e6"
           envFrom:
             - secretRef:
                 name: backend-secret
