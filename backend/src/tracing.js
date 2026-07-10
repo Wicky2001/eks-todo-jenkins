@@ -1,4 +1,6 @@
 "use strict";
+const { diag, DiagConsoleLogger, DiagLogLevel } = require("@opentelemetry/api");
+diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
 const pino = require("pino");
 const logger = pino();
 const { NodeTracerProvider } = require("@opentelemetry/sdk-trace-node");
@@ -18,26 +20,25 @@ const {
 } = require("@opentelemetry/instrumentation-express");
 
 try {
-  // Initialize the provider
-  const provider = new NodeTracerProvider({
-    resource: new Resource({
-      [SemanticResourceAttributes.SERVICE_NAME]: "todo-backend", // Replace with your service name
-    }),
-  });
-
-
+ 
+  // create a exporter
   const collector_endpoint = process.env.OTEL_EXPORTER_JAEGER_ENDPOINT;
+
   console.log("OTEL_EXPORTER_JAEGER_ENDPOINT:", collector_endpoint);
+  console.log("OTEL_LOG_LEVEL:", process.env.OTEL_LOG_LEVEL);
+
   const collectorOptions = {
     url: collector_endpoint, // url is optional and can be omitted - default is http://localhost:4318/v1/traces
-    headers: {}, // an optional object containing custom headers to be sent with each request
-    concurrencyLimit: 10, // an optional limit on pending requests
   };
 
   const exporter = new OTLPTraceExporter(collectorOptions);
 
-  // Add the exporter to the provider
-  provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+  // Add a span processor to the provider
+  const provider = new NodeTracerProvider({
+  spanProcessors: [
+    new SimpleSpanProcessor(exporter)
+  ]
+});
 
   // Initialize the provider and instrumentations
   provider.register();
