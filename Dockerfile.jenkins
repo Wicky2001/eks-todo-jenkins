@@ -1,0 +1,16 @@
+# ============================================================
+#  Dockerfile.jenkins
+#  A Jenkins image that also has the Docker CLI inside it,
+#  so pipelines can run `docker build` / `docker push`.
+#  It talks to the host's Docker engine through the mounted socket.
+# ============================================================
+FROM jenkins/jenkins:lts
+
+USER root
+
+# Install the Docker command-line client (not a second engine).
+RUN apt-get update \
+    && apt-get install -y docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+USER jenkins
