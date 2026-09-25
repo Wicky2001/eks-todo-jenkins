@@ -1,0 +1,66 @@
+// ============================================================
+//  Jenkinsfile.migration
+//  Build the Mongoose migration Docker image and push it to Docker Hub.
+//  Replaces .github/workflows/migration-job-deploy.yaml (ECR -> Docker Hub).
+// ============================================================
+
+pipeline {
+    agent any
+
+    triggers {
+        githubPush()
+    }
+
+    environment {
+        DOCKERHUB  = credentials('dockerhub')
+        IMAGE_NAME = "${DOCKERHUB_USR}/eks-todo-migration"
+        IMAGE_TAG  = "${GIT_COMMIT.take(7)}-${BUILD_NUMBER}"
+    }
+
+    options {
+        timeout(time: 20, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build image') {
+            steps {
+                sh 'docker build -f mongoose/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .'
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                sh 'echo "$DOCKERHUB_PSW" | docker login -u "$DOCKERHUB_USR" --password-stdin'
+            }
+        }
+
+        stage('Push image') {
+            steps {
+                sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
+                sh 'docker push $IMAGE_NAME:latest'
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout || true'
+            sh 'docker image rm $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest || true'
+        }
+        success {
+            echo "Pushed $IMAGE_NAME:$IMAGE_TAG and :latest to Docker Hub"
+        }
+        failure {
+            echo 'Migration pipeline failed'
+        }
+    }
+}
