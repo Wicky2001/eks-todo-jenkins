@@ -44,6 +44,7 @@ pipeline {
         }
 
         stage('Build image') {
+            when { changeset "frontend/**" }
             steps {
                 // --build-arg passes the API URL into the Dockerfile, like your GHA workflow.
                 sh '''

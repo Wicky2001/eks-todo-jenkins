@@ -33,6 +33,7 @@ pipeline {
         }
 
         stage('Build image') {
+            when { changeset "mongoose/**" }
             steps {
                 sh 'docker build -f mongoose/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .'
             }
