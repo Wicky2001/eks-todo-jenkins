@@ -36,6 +36,7 @@ pipeline {
         }
 
         stage('Build image') {
+            when { changeset "backend/**" }
             steps {
                 // Context is the repo root ('.'), same as your GitHub Actions setup.
                 sh 'docker build -f backend/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .'
