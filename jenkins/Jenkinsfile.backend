@@ -1,6 +1,7 @@
 
 pipeline {
-    agent any
+    // Run on the agent labelled 'docker' (agent1), keeping the controller free.
+    agent { label 'docker' }
 
     // Start automatically when GitHub sends a push webhook.
     triggers {
