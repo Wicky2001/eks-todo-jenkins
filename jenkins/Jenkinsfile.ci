@@ -1,0 +1,73 @@
+// ============================================================
+//  Jenkinsfile.ci  —  Pull-request pipeline
+//  1) SonarCloud static analysis (scanner waits for the Quality Gate and
+//     FAILS the build if the gate fails -- Path B, no webhook needed)
+//  2) Build backend / frontend / migration images to prove they build
+//  Images are built but NOT pushed (this is a check, not a release).
+// ============================================================
+
+pipeline {
+    agent { label 'docker' }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        // A throwaway tag so PR images don't clash. CHANGE_ID exists on PR builds.
+        IMG_TAG = "pr-${env.CHANGE_ID ?: env.BRANCH_NAME}-${BUILD_NUMBER}"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('SonarCloud Analysis') {
+            steps {
+                // 'SonarCloud' = the server name configured in Manage Jenkins -> System.
+                // withSonarQubeEnv provides SONAR_HOST_URL and SONAR_AUTH_TOKEN.
+                // sonar.qualitygate.wait=true (in sonar-project.properties) makes the
+                // scanner wait for the gate and exit non-zero if it fails -> stage RED.
+                withSonarQubeEnv('SonarCloud') {
+                    sh '''
+                        docker run --rm \
+                          -e SONAR_HOST_URL="$SONAR_HOST_URL" \
+                          -e SONAR_TOKEN="$SONAR_AUTH_TOKEN" \
+                          -v "$PWD:/usr/src" \
+                          sonarsource/sonar-scanner-cli
+                    '''
+                }
+            }
+        }
+
+        stage('Build backend image') {
+            steps {
+                sh 'docker build -f backend/Dockerfile -t eks-todo-backend:$IMG_TAG .'
+            }
+        }
+
+        stage('Build frontend image') {
+            steps {
+                sh 'docker build -f frontend/Dockerfile --build-arg VITE_API_BASE_URL="http://localhost:8081" -t eks-todo-frontend:$IMG_TAG .'
+            }
+        }
+
+        stage('Build migration image') {
+            steps {
+                sh 'docker build -f mongoose/Dockerfile -t eks-todo-migration:$IMG_TAG .'
+            }
+        }
+    }
+
+    post {
+        always {
+            // Remove the PR images so the agent disk stays clean.
+            sh 'docker image rm eks-todo-backend:$IMG_TAG eks-todo-frontend:$IMG_TAG eks-todo-migration:$IMG_TAG || true'
+        }
+    }
+}
