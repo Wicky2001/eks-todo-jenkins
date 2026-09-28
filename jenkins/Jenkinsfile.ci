@@ -27,6 +27,22 @@ pipeline {
             }
         }
 
+        stage('Debug: verify Sonar config') {
+            steps {
+        echo "----- sonar-project.properties on disk -----"
+        sh 'cat sonar-project.properties'
+
+        withSonarQubeEnv('SonarCloud') {
+            sh '''
+                echo "SONAR_HOST_URL = $SONAR_HOST_URL"
+                echo "SONAR_AUTH_TOKEN length = ${#SONAR_AUTH_TOKEN}"
+            '''
+        }
+    }
+}
+
+        
+
         stage('SonarCloud Analysis') {
             steps {
                 // 'SonarCloud' = the server name configured in Manage Jenkins -> System.
