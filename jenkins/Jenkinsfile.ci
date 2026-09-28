@@ -26,35 +26,25 @@ pipeline {
             }
         }
 
-        stage('Debug: verify Sonar config') {
-            steps {
-                echo "----- sonar-project.properties on disk -----"
-                sh 'cat sonar-project.properties'
-                sh 'docker run --rm -v "$PWD:/usr/src" alpine ls -la /usr/src'
+        // stage('Debug: verify Sonar config') {
+        //     steps {
+        //         echo "----- sonar-project.properties on disk -----"
+        //         sh 'cat sonar-project.properties'
+        //         sh 'docker run --rm -v "$PWD:/usr/src" alpine ls -la /usr/src'
 
-                withSonarQubeEnv('SonarCloud') {
-                    sh '''
-                        echo "SONAR_HOST_URL = $SONAR_HOST_URL"
-                        echo "SONAR_AUTH_TOKEN length = ${#SONAR_AUTH_TOKEN}"
-                    '''
-                }
-            }
-        }
+        //         withSonarQubeEnv('SonarCloud') {
+        //             sh '''
+        //                 echo "SONAR_HOST_URL = $SONAR_HOST_URL"
+        //                 echo "SONAR_AUTH_TOKEN length = ${#SONAR_AUTH_TOKEN}"
+        //             '''
+        //         }
+        //     }
+        // }
 
         stage('SonarCloud Analysis') {
             steps {
-                // 'SonarCloud' = the server name configured in Manage Jenkins -> System.
-                // withSonarQubeEnv provides SONAR_HOST_URL and SONAR_AUTH_TOKEN.
-                // sonar.qualitygate.wait=true (in sonar-project.properties) makes the
-                // scanner wait for the gate and exit non-zero if it fails -> stage RED.
                 withSonarQubeEnv('SonarCloud') {
-                    sh '''
-                        docker run --rm \
-                          -e SONAR_HOST_URL="$SONAR_HOST_URL" \
-                          -e SONAR_TOKEN="$SONAR_AUTH_TOKEN" \
-                          -v "$PWD:/usr/src" \
-                          sonarsource/sonar-scanner-cli
-                    '''
+                    sh 'SONAR_TOKEN="$SONAR_AUTH_TOKEN" sonar-scanner'
                 }
             }
         }
