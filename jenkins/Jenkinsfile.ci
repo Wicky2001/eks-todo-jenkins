@@ -29,8 +29,8 @@ pipeline {
 
         stage('Debug: verify Sonar config') {
             steps {
-        echo "----- sonar-project.properties on disk -----"
-        sh 'cat sonar-project.properties'
+            echo "----- sonar-project.properties on disk -----"
+            sh 'cat sonar-project.properties'
 
         withSonarQubeEnv('SonarCloud') {
             sh '''
