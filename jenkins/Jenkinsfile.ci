@@ -20,7 +20,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
@@ -29,19 +28,18 @@ pipeline {
 
         stage('Debug: verify Sonar config') {
             steps {
-            echo "----- sonar-project.properties on disk -----"
-            sh 'cat sonar-project.properties'
+                echo "----- sonar-project.properties on disk -----"
+                sh 'cat sonar-project.properties'
+                sh 'docker run --rm -v "$PWD:/usr/src" alpine ls -la /usr/src'
 
-        withSonarQubeEnv('SonarCloud') {
-            sh '''
-                echo "SONAR_HOST_URL = $SONAR_HOST_URL"
-                echo "SONAR_AUTH_TOKEN length = ${#SONAR_AUTH_TOKEN}"
-            '''
+                withSonarQubeEnv('SonarCloud') {
+                    sh '''
+                        echo "SONAR_HOST_URL = $SONAR_HOST_URL"
+                        echo "SONAR_AUTH_TOKEN length = ${#SONAR_AUTH_TOKEN}"
+                    '''
+                }
+            }
         }
-    }
-}
-
-        
 
         stage('SonarCloud Analysis') {
             steps {
