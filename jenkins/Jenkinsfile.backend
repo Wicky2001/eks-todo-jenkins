@@ -44,6 +44,7 @@ pipeline {
         }
 
         stage('Login to Docker Hub') {
+            when { changeset "backend/**" }
             steps {
                 // --password-stdin keeps the password out of the process list / logs.
                 sh 'echo "$DOCKERHUB_PSW" | docker login -u "$DOCKERHUB_USR" --password-stdin'
@@ -51,6 +52,7 @@ pipeline {
         }
 
         stage('Push image') {
+            when { changeset "backend/**" }
             steps {
                 sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
                 sh 'docker push $IMAGE_NAME:latest'
