@@ -1,10 +1,4 @@
-// ============================================================
-//  Jenkinsfile.ci  —  Pull-request pipeline
-//  1) SonarCloud static analysis (scanner waits for the Quality Gate and
-//     FAILS the build if the gate fails -- Path B, no webhook needed)
-//  2) Build backend / frontend / migration images to prove they build
-//  Images are built but NOT pushed (this is a check, not a release).
-// ============================================================
+
 
 pipeline {
     agent { label 'docker' }
@@ -29,10 +23,7 @@ pipeline {
 
         stage('SonarCloud Analysis') {
             steps {
-                // 'SonarCloud' = the server name configured in Manage Jenkins -> System.
-                // withSonarQubeEnv provides SONAR_HOST_URL and SONAR_AUTH_TOKEN.
-                // sonar.qualitygate.wait=true (in sonar-project.properties) makes the
-                // scanner wait for the gate and exit non-zero if it fails -> stage RED.
+
                 withSonarQubeEnv('SonarCloud') {
                     sh '''
                         docker run --rm \

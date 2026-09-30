@@ -1,0 +1,114 @@
+pipeline {
+    agent { label 'docker' }
+
+    triggers {
+        githubPush()
+    }
+
+    parameters {
+        string(
+            name: 'VITE_API_BASE_URL',
+            defaultValue: 'http://localhost:8081',
+            description: 'Base URL of the backend API, baked into the frontend build'
+        )
+    }
+
+    environment {
+        DOCKERHUB = credentials('dockerhub')
+        IMAGE_TAG = "${GIT_COMMIT.take(7)}-${BUILD_NUMBER}"
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Backend') {
+            when { changeset "backend/**" }
+            environment {
+                IMAGE_NAME = "${DOCKERHUB_USR}/eks-todo-backend"
+            }
+            steps {
+                sh 'docker build -f backend/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .'
+                sh 'echo "$DOCKERHUB_PSW" | docker login -u "$DOCKERHUB_USR" --password-stdin'
+                sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
+                sh 'docker push $IMAGE_NAME:latest'
+            }
+            post {
+                always {
+                    sh 'docker image rm $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest || true'
+                }
+                success {
+                    echo "Pushed $IMAGE_NAME:$IMAGE_TAG and :latest to Docker Hub"
+                }
+            }
+        }
+
+        stage('Frontend') {
+            when { changeset "frontend/**" }
+            environment {
+                IMAGE_NAME = "${DOCKERHUB_USR}/eks-todo-frontend"
+            }
+            steps {
+                sh '''
+                    docker build \
+                      -f frontend/Dockerfile \
+                      --build-arg VITE_API_BASE_URL="$VITE_API_BASE_URL" \
+                      -t $IMAGE_NAME:$IMAGE_TAG \
+                      -t $IMAGE_NAME:latest \
+                      .
+                '''
+                sh 'echo "$DOCKERHUB_PSW" | docker login -u "$DOCKERHUB_USR" --password-stdin'
+                sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
+                sh 'docker push $IMAGE_NAME:latest'
+            }
+            post {
+                always {
+                    sh 'docker image rm $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest || true'
+                }
+                success {
+                    echo "Pushed $IMAGE_NAME:$IMAGE_TAG and :latest to Docker Hub"
+                }
+            }
+        }
+
+        stage('Migration') {
+            when { changeset "mongoose/**" }
+            environment {
+                IMAGE_NAME = "${DOCKERHUB_USR}/eks-todo-migration"
+            }
+            steps {
+                sh 'docker build -f mongoose/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .'
+                sh 'echo "$DOCKERHUB_PSW" | docker login -u "$DOCKERHUB_USR" --password-stdin'
+                sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
+                sh 'docker push $IMAGE_NAME:latest'
+            }
+            post {
+                always {
+                    sh 'docker image rm $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest || true'
+                }
+                success {
+                    echo "Pushed $IMAGE_NAME:$IMAGE_TAG and :latest to Docker Hub"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'docker logout || true'
+        }
+        failure {
+            echo 'Pipeline failed'
+        }
+    }
+}
