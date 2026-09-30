@@ -3,6 +3,10 @@ kind: Job
 metadata:
   name: migrate-db
   namespace: app
+  annotations:
+    # A Job's pod template is immutable, so a new image tag can't be applied
+    # in place. This tells Argo CD to delete and recreate the Job instead.
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
 spec:
   backoffLimit: 1
   template:

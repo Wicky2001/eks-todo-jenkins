@@ -6,16 +6,16 @@ metadata:
 spec:
   project: eks-todo-project
   sources:
-    - repoURL: https://github.com/Wicky2001/eks-todo.git
+    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins.git
       targetRevision: main
       path: k8s/app/migration # Path 2
-    - repoURL: https://github.com/Wicky2001/eks-todo.git
+    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins.git
       targetRevision: main
       path: k8s/app/frontend # Path 1
-    - repoURL: https://github.com/Wicky2001/eks-todo.git
+    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins.git
       targetRevision: main
       path: k8s/app/backend
-    - repoURL: https://github.com/Wicky2001/eks-todo.git
+    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins.git
       targetRevision: main
       path: k8s/app/ingress
   destination:

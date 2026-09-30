@@ -1,0 +1,21 @@
+# ============================================================
+#  Dockerfile.controller
+#  The Jenkins controller (web UI + scheduler), with the Docker CLI
+#  so it can talk to the host's Docker engine through the socket.
+# ============================================================
+FROM jenkins/jenkins:lts
+
+USER root
+
+# Install the Docker command-line client.
+RUN apt-get update \
+    && apt-get install -y docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+# Give the jenkins user access to the Docker socket.
+# DOCKER_GID must match the host's 'docker' group id.
+ARG DOCKER_GID=993
+RUN groupmod -g ${DOCKER_GID} docker || groupadd -g ${DOCKER_GID} docker
+RUN usermod -aG docker jenkins
+
+USER jenkins

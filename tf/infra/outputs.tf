@@ -124,6 +124,12 @@ output "migration_ecr_repository_url" {
 }
 
 
+output "jenkins_iam_user_name" {
+  description = "IAM user Jenkins uses to push to ECR (create its access key in the console)"
+  value       = aws_iam_user.jenkins.name
+}
+
+
 
 
 

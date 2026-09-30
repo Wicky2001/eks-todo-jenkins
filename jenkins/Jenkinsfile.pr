@@ -9,7 +9,6 @@ pipeline {
     }
 
     environment {
-        // A throwaway tag so PR images don't clash. CHANGE_ID exists on PR builds.
         IMG_TAG = "pr-${env.CHANGE_ID ?: env.BRANCH_NAME}-${BUILD_NUMBER}"
     }
 
@@ -57,7 +56,6 @@ pipeline {
 
     post {
         always {
-            // Remove the PR images so the agent disk stays clean.
             sh 'docker image rm eks-todo-backend:$IMG_TAG eks-todo-frontend:$IMG_TAG eks-todo-migration:$IMG_TAG || true'
         }
     }

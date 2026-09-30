@@ -1,3 +1,11 @@
+// ============================================================
+//  Jenkinsfile.deploy
+//  1) Build + push only the services whose folder changed, to ECR,
+//     tagged with the full git commit SHA (never 'latest').
+//  2) Write the new tag into the Kubernetes manifests and push
+//     that commit to main. Argo CD sees the change and deploys it.
+// ============================================================
+
 pipeline {
     agent { label 'docker' }
 
@@ -14,8 +22,19 @@ pipeline {
     }
 
     environment {
-        DOCKERHUB = credentials('dockerhub')
-        IMAGE_TAG = "${GIT_COMMIT.take(7)}-${BUILD_NUMBER}"
+        AWS_REGION   = 'ap-south-1'
+        ECR_REGISTRY = '078238935484.dkr.ecr.ap-south-1.amazonaws.com'
+
+        // Two 'Secret text' credentials in Jenkins (keys of the eks-todo-jenkins IAM user).
+        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
+        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+
+        // 'Username with password': GitHub username + a Personal Access Token.
+        // Used to push the manifest change back to the repo.
+        GITHUB = credentials('github-push')
+
+        // Unique per commit, so every deploy is a real change Argo CD can detect.
+        IMAGE_TAG = "${GIT_COMMIT}"
     }
 
     options {
@@ -32,80 +51,108 @@ pipeline {
             }
         }
 
+        stage('Login to ECR') {
+            when {
+                anyOf {
+                    changeset "backend/**"
+                    changeset "frontend/**"
+                    changeset "mongoose/**"
+                }
+            }
+            steps {
+                // The AWS CLI reads AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY from the environment,
+                // gets a temporary ECR password and pipes it into 'docker login'.
+                sh 'aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"'
+            }
+        }
+
         stage('Backend') {
             when { changeset "backend/**" }
             environment {
-                IMAGE_NAME = "${DOCKERHUB_USR}/eks-todo-backend"
+                IMAGE = "${ECR_REGISTRY}/eks-todo-backend:${IMAGE_TAG}"
             }
             steps {
-                sh 'docker build -f backend/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .'
-                sh 'echo "$DOCKERHUB_PSW" | docker login -u "$DOCKERHUB_USR" --password-stdin'
-                sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
-                sh 'docker push $IMAGE_NAME:latest'
+                sh 'docker build -f backend/Dockerfile -t $IMAGE .'
+                sh 'docker push $IMAGE'
+                script { env.CHANGED_SERVICES = (env.CHANGED_SERVICES ?: '') + ' backend' }
             }
             post {
-                always {
-                    sh 'docker image rm $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest || true'
-                }
-                success {
-                    echo "Pushed $IMAGE_NAME:$IMAGE_TAG and :latest to Docker Hub"
-                }
+                always { sh 'docker image rm $IMAGE || true' }
             }
         }
 
         stage('Frontend') {
             when { changeset "frontend/**" }
             environment {
-                IMAGE_NAME = "${DOCKERHUB_USR}/eks-todo-frontend"
+                IMAGE = "${ECR_REGISTRY}/eks-todo-frontend:${IMAGE_TAG}"
             }
             steps {
                 sh '''
                     docker build \
                       -f frontend/Dockerfile \
                       --build-arg VITE_API_BASE_URL="$VITE_API_BASE_URL" \
-                      -t $IMAGE_NAME:$IMAGE_TAG \
-                      -t $IMAGE_NAME:latest \
+                      -t $IMAGE \
                       .
                 '''
-                sh 'echo "$DOCKERHUB_PSW" | docker login -u "$DOCKERHUB_USR" --password-stdin'
-                sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
-                sh 'docker push $IMAGE_NAME:latest'
+                sh 'docker push $IMAGE'
+                script { env.CHANGED_SERVICES = (env.CHANGED_SERVICES ?: '') + ' frontend' }
             }
             post {
-                always {
-                    sh 'docker image rm $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest || true'
-                }
-                success {
-                    echo "Pushed $IMAGE_NAME:$IMAGE_TAG and :latest to Docker Hub"
-                }
+                always { sh 'docker image rm $IMAGE || true' }
             }
         }
 
         stage('Migration') {
             when { changeset "mongoose/**" }
             environment {
-                IMAGE_NAME = "${DOCKERHUB_USR}/eks-todo-migration"
+                IMAGE = "${ECR_REGISTRY}/eks-todo-migration:${IMAGE_TAG}"
             }
             steps {
-                sh 'docker build -f mongoose/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .'
-                sh 'echo "$DOCKERHUB_PSW" | docker login -u "$DOCKERHUB_USR" --password-stdin'
-                sh 'docker push $IMAGE_NAME:$IMAGE_TAG'
-                sh 'docker push $IMAGE_NAME:latest'
+                sh 'docker build -f mongoose/Dockerfile -t $IMAGE .'
+                sh 'docker push $IMAGE'
+                script { env.CHANGED_SERVICES = (env.CHANGED_SERVICES ?: '') + ' migration' }
             }
             post {
-                always {
-                    sh 'docker image rm $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest || true'
-                }
-                success {
-                    echo "Pushed $IMAGE_NAME:$IMAGE_TAG and :latest to Docker Hub"
-                }
+                always { sh 'docker image rm $IMAGE || true' }
+            }
+        }
+
+        stage('Update Kubernetes manifests') {
+            when { expression { env.CHANGED_SERVICES != null } }
+            steps {
+                sh '''
+                    git config user.name "Jenkins"
+                    git config user.email "jenkins@eks-todo.local"
+
+                    # Start from the latest main, so we never overwrite newer commits.
+                    git fetch origin main
+                    git checkout -B main FETCH_HEAD
+
+                    for svc in $CHANGED_SERVICES; do
+                      case "$svc" in
+                        backend)   file=k8s/app/backend/deployment.yaml ;;
+                        frontend)  file=k8s/app/frontend/deployment.yaml ;;
+                        migration) file=k8s/app/migration/migration-job.yaml ;;
+                      esac
+                      # Replace the old tag after 'eks-todo-<svc>:' with the new one.
+                      sed -i "s|eks-todo-${svc}:[^\\"[:space:]]*|eks-todo-${svc}:${IMAGE_TAG}|" "$file"
+                      git add "$file"
+                    done
+
+                    git commit -m "deploy:${CHANGED_SERVICES} -> ${IMAGE_TAG}"
+
+                    # The helper hands git the token through the environment,
+                    # so it never appears in the command line or the remote URL.
+                    git -c credential.helper='!f() { echo username=$GITHUB_USR; echo password=$GITHUB_PSW; }; f' \
+                      push origin main
+                '''
             }
         }
     }
 
     post {
         always {
-            sh 'docker logout || true'
+            sh 'docker logout "$ECR_REGISTRY" || true'
         }
         failure {
             echo 'Pipeline failed'
