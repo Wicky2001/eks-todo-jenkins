@@ -1,95 +1,94 @@
 # Jenkins Setup Guide
 
-How to run Jenkins for this project on a Linux host (e.g. an EC2 instance) using Docker: one **controller** and one **agent**, both as containers.
+Runs Jenkins on a Linux host as two containers: a **controller** (UI + scheduling) and an **agent** (runs the pipelines). Run everything from the repo root.
 
-All commands are run from the **repo root** on the host.
+## Architecture
 
-## What's in this folder
+```mermaid
+flowchart LR
+    subgraph internet["Public internet"]
+        you["You (browser)"]
+        gh["GitHub webhook"]
+    end
 
-| File | What it is |
+    you ==>|"public internet<br/>port 8080"| ctrl
+    gh ==>|"public internet<br/>port 8080"| ctrl
+
+    subgraph host["Host (EC2)"]
+        subgraph net["jenkins-net: private Docker network (not reachable from the internet)"]
+            ctrl["jenkins<br/>controller"]
+            agent["agent1<br/>runs the pipelines"]
+        end
+        sock{{"/var/run/docker.sock"}}
+        engine[("Docker engine")]
+        vol[("jenkins_home<br/>volume")]
+    end
+
+    agent -->|"private: http://jenkins:8080"| ctrl
+    ctrl --- vol
+    agent -->|"docker build / push"| sock
+    sock --> engine
+
+    style internet fill:#fff4e5,stroke:#e67e22,stroke-width:2px
+    style net fill:#e8f4fd,stroke:#2980b9,stroke-width:2px,stroke-dasharray: 5 3
+```
+
+| Name | What |
 |---|---|
-| `Dockerfile.controller` | Jenkins controller: web UI, job scheduling, credentials. Doesn't run builds. |
-| `Dockerfile.agent` | Build agent: runs the pipelines. Has Docker CLI, SonarScanner and AWS CLI. |
-| `Jenkinsfile.deploy` | Push pipeline: build → push to ECR → update k8s manifests (Argo CD deploys) |
-| `Jenkinsfile.pr` | Pull request pipeline: SonarCloud scan + test builds |
+| `jenkins-controller:latest` / `jenkins-agent:latest` | The two images |
+| `jenkins` / `agent1` | The two containers (`agent1` is also the node name in Jenkins) |
+| `jenkins-net` | Docker network they share |
+| `jenkins_home` | Volume holding all Jenkins data |
 
-| Name | Used for |
-|---|---|
-| `jenkins-controller:latest` | Controller image |
-| `jenkins-agent:latest` | Agent image |
-| `jenkins` | Controller container |
-| `agent1` | Agent container (and the node name in Jenkins) |
-| `jenkins-net` | Docker network both containers join |
-| `jenkins_home` | Docker volume holding all Jenkins data (jobs, credentials, plugins) |
+## The Docker socket, simply
 
-## How the pieces talk to each other
+`docker build` is just a **CLI** that sends requests to the Docker **engine** through the file `/var/run/docker.sock`. Our images install only the CLI. Mounting the host's socket (`-v /var/run/docker.sock:/var/run/docker.sock`) plugs the **host's** engine into the container, so builds run on the host and no second engine is needed.
 
-```
-                         host (EC2)
- ┌───────────────────────────────────────────────────────┐
- │  jenkins-net (Docker network)                         │
- │  ┌─────────────┐   http://jenkins:8080  ┌──────────┐  │
- │  │  jenkins    │◀───────────────────────│  agent1  │  │
- │  │ (controller)│                        │          │  │
- │  └─────────────┘                        └────┬─────┘  │
- │                                              │        │
- │                     /var/run/docker.sock ◀───┘        │
- │                     (host's Docker engine)            │
- └───────────────────────────────────────────────────────┘
-        ▲ :8080 (browser, your IP only)
+```mermaid
+sequenceDiagram
+    participant P as Pipeline step
+    participant C as docker CLI (in agent1)
+    participant S as docker.sock (mounted)
+    participant E as Docker engine (host)
+    P->>C: docker build ...
+    C->>S: send request
+    S->>E: forward request
+    E-->>E: builds the image on the HOST
+    E-->>C: result
 ```
 
-- The **agent connects to the controller** using the container name `jenkins`. That works because both containers are on `jenkins-net`, where Docker gives every container a hostname equal to its name.
-- Only port `8080` is published, so you can open the UI in a browser. Agent traffic never leaves the host.
+Linux checks socket permission by group **ID**, so `DOCKER_GID` must equal the host's `docker` group ID.
 
-## The Docker socket, simply explained
-
-The pipelines run `docker build` and `docker push`, but the agent is itself a container. So how does it run Docker?
-
-Docker has two parts:
-- **Docker CLI**: the `docker` command. It only *sends requests*.
-- **Docker engine**: the background service that actually builds images and runs containers.
-
-The CLI sends its requests to the engine through a special file: `/var/run/docker.sock` (the "socket"). Think of it as the engine's phone line.
-
-Our images install **only the CLI**. With
-
-```
--v /var/run/docker.sock:/var/run/docker.sock
+```mermaid
+flowchart LR
+    a["Host: docker group has ID 993"] --> b["Build image with<br/>--build-arg DOCKER_GID=993"]
+    b --> c["Inside the image:<br/>docker group = 993,<br/>jenkins user added to it"]
+    c --> d["jenkins user may<br/>use docker.sock"]
 ```
 
-we plug the **host's** phone line into the container. So when the agent runs `docker build`, the request goes to the **host's** Docker engine, which does the work. No second Docker engine runs inside the container. Images built this way appear on the host (`docker images` on the host shows them).
+> ⚠️ Socket access is effectively root on the host. Only mount it into containers you trust.
 
-**Why `DOCKER_GID`?** The socket file belongs to the host's `docker` group. Linux checks permissions by group **ID number**, not name. The images set their internal `docker` group to the host's ID, and add the `jenkins` user to it, so `jenkins` is allowed to use the socket. If the numbers don't match you get `permission denied ... docker.sock`.
+## Setup
 
-> ⚠️ Anything with access to the socket effectively has root on the host. Only mount it into containers you trust.
+```mermaid
+flowchart LR
+    s1["1. Get<br/>DOCKER_GID"] --> s2["2. Create<br/>network"] --> s3["3. Build + run<br/>controller"] --> s4["4. Unlock<br/>Jenkins"] --> s5["5. Create node<br/>+ copy secret"] --> s6["6. Build + run<br/>agent"] --> s7["7. Check<br/>agent is online"]
+```
 
-## First-time setup
-
-### 1. Find the host's docker group ID
-
+**1. Get the host's docker group ID** (used as `DOCKER_GID` below, examples use `993`)
 ```bash
 getent group docker | cut -d: -f3
 ```
 
-Use this number as `DOCKER_GID` below (examples use `993`).
-
-### 2. Create the network
-
+**2. Create the network**
 ```bash
 docker network create jenkins-net
 ```
 
-### 3. Build and run the controller
-
+**3. Build and run the controller**
 ```bash
-docker build \
-  -f jenkins/Dockerfile.controller \
-  --build-arg DOCKER_GID=993 \
-  -t jenkins-controller:latest \
-  jenkins
+docker build -f jenkins/images/Dockerfile.controller --build-arg DOCKER_GID=993 -t jenkins-controller:latest jenkins/images
 ```
-
 ```bash
 docker run -d \
   --name jenkins \
@@ -101,44 +100,17 @@ docker run -d \
   jenkins-controller:latest
 ```
 
-`-v jenkins_home:/var/jenkins_home` stores all Jenkins data in a volume, so it survives restarts and image rebuilds.
-
-### 4. Unlock Jenkins
-
-Get the first-time admin password:
-
+**4. Unlock Jenkins** at `http://<host-ip>:8080` with:
 ```bash
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-Open `http://<host-ip>:8080`, paste it, install the suggested plugins, and create your admin user.
+**5. Create the agent node** (Manage Jenkins → Nodes → New Node): name `agent1`, Permanent Agent, remote root `/home/jenkins/agent1`, label `docker`, launch method "connect to the controller". Copy the **secret** it shows.
 
-### 5. Create the agent node in Jenkins
-
-Manage Jenkins → Nodes → **New Node**:
-
-| Field | Value |
-|---|---|
-| Node name | `agent1` |
-| Type | Permanent Agent |
-| Remote root directory | `/home/jenkins/agent1` |
-| Labels | `docker` (the Jenkinsfiles use `agent { label 'docker' }`) |
-| Launch method | Launch agent by connecting it to the controller |
-
-Save, then open the node. The page shows a **secret**. Copy it for the next step.
-
-Also set the controller's own executors to `0` (Manage Jenkins → Nodes → Built-In Node → Configure), so builds only run on the agent.
-
-### 6. Build and run the agent
-
+**6. Build and run the agent**
 ```bash
-docker build \
-  -f jenkins/Dockerfile.agent \
-  --build-arg DOCKER_GID=993 \
-  -t jenkins-agent:latest \
-  jenkins
+docker build -f jenkins/images/Dockerfile.agent --build-arg DOCKER_GID=993 -t jenkins-agent:latest jenkins/images
 ```
-
 ```bash
 docker run -d \
   --name agent1 \
@@ -151,78 +123,70 @@ docker run -d \
   -e JENKINS_AGENT_WORKDIR=/home/jenkins/agent1 \
   jenkins-agent:latest
 ```
+No space after each `\`.
 
-Every line except the last ends with `\`, with **no space after it**.
-
-### 7. Check everything works
-
+**7. Check** — `agent1` should show **online** in Jenkins:
 ```bash
-docker ps
 docker exec agent1 docker version
 docker exec agent1 aws --version
-docker exec agent1 sonar-scanner --version
 ```
 
-In Jenkins, `agent1` should show as **online**.
+## What the deploy pipeline does
 
-## Credentials to add in Jenkins
+```mermaid
+flowchart LR
+    push["Push to main"] --> jenkins["Jenkins<br/>Jenkinsfile.deploy"]
+    jenkins -->|"build changed services,<br/>tag = commit SHA"| ecr[("Amazon ECR")]
+    jenkins -->|"commit new image tag<br/>to k8s/app/*.yaml"| repo["GitHub repo (main)"]
+    repo -->|"Argo CD sees the change"| argo["Argo CD"]
+    argo -->|"deploys"| eks["EKS cluster"]
+    ecr -.->|"image pulled"| eks
+```
 
-Manage Jenkins → Credentials → (global) → Add. The **IDs must match exactly**, because the Jenkinsfiles refer to them.
+## Jenkins credentials
 
-| ID | Type | Value | Used by |
-|---|---|---|---|
-| `aws-access-key-id` | Secret text | Access key ID of IAM user `eks-todo-jenkins` | `Jenkinsfile.deploy` |
-| `aws-secret-access-key` | Secret text | Its secret access key | `Jenkinsfile.deploy` |
-| `github-push` | Username with password | GitHub username + Personal Access Token (Contents: write) | `Jenkinsfile.deploy` |
+Manage Jenkins → Credentials. IDs must match exactly.
 
-SonarCloud: Manage Jenkins → System → SonarQube servers → add a server named **`SonarCloud`** with your SonarCloud token (used by `Jenkinsfile.pr`).
+```mermaid
+flowchart LR
+    k1["aws-access-key-id<br/>aws-secret-access-key"] -->|"login + push images"| ecr[("ECR")]
+    k2["github-push"] -->|"push tag change to main"| repo["GitHub repo"]
+    k3["SonarCloud server"] -->|"PR analysis"| sonar["SonarCloud"]
+```
 
-## Jobs to create
+| ID | Type | Value |
+|---|---|---|
+| `aws-access-key-id` | Secret text | Access key ID of IAM user `eks-todo-jenkins` |
+| `aws-secret-access-key` | Secret text | Its secret key |
+| `github-push` | Username with password | GitHub username + token (Contents: write) |
 
-| Job | Type | Script path | Trigger |
-|---|---|---|---|
-| Deploy | Pipeline (SCM) | `jenkins/Jenkinsfile.deploy` | GitHub push webhook, branch `main` |
-| PR checks | Multibranch Pipeline | `jenkins/Jenkinsfile.pr` | Pull requests |
+For `Jenkinsfile.pr`, add a SonarQube server named `SonarCloud` (Manage Jenkins → System).
 
-GitHub webhook: repo → Settings → Webhooks → `http://<host-ip>:8080/github-webhook/`.
+## Jobs
 
-## Everyday commands
+| Job | Type | Script path |
+|---|---|---|
+| Deploy | Pipeline | `jenkins/Jenkinsfile.deploy` (GitHub push webhook, `main`) |
+| PR checks | Multibranch | `jenkins/Jenkinsfile.pr` |
+
+Webhook URL: `http://<host-ip>:8080/github-webhook/`
+
+## Everyday
 
 ```bash
-# Logs
-docker logs -f jenkins
-docker logs -f agent1
-
-# Restart
+docker logs -f agent1        # logs
 docker restart jenkins agent1
-
-# Stop / start
-docker stop agent1 jenkins
-docker start jenkins agent1
 ```
 
-### Updating an image (e.g. after editing a Dockerfile)
-
-Rebuild, remove the old container, run again with the same `docker run` command as in the setup steps:
-
-```bash
-docker build -f jenkins/Dockerfile.agent --build-arg DOCKER_GID=993 -t jenkins-agent:latest jenkins
-docker rm -f agent1
-# then run the step 6 'docker run' command again
-```
-
-Recreating the **controller** container is safe as long as you reuse `-v jenkins_home:/var/jenkins_home`. **Never** run `docker volume rm jenkins_home`, because that deletes all jobs, credentials and plugins.
+To update an image: rebuild it (step 3 or 6), `docker rm -f <container>`, run it again. Keep `-v jenkins_home:...` on the controller. **Never** `docker volume rm jenkins_home`, since it holds all jobs and credentials.
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `permission denied ... /var/run/docker.sock` | `DOCKER_GID` doesn't match the host. Re-check step 1 and rebuild the image. |
-| Agent stays offline | `docker logs agent1`. Check the secret, the node name matches `JENKINS_AGENT_NAME`, and both containers are on `jenkins-net` (`docker network inspect jenkins-net`). |
-| `docker run requires at least 1 argument` | A line break without `\` split the command. The image name must be part of the command. |
-| Agent secret leaked | Delete the node and create one with a new name (the secret is derived from the node name). |
+| `permission denied ... docker.sock` | `DOCKER_GID` doesn't match the host. Redo step 1 and rebuild. |
+| Agent offline | `docker logs agent1`. Check the secret, the node name, and that both containers are on `jenkins-net`. |
+| `docker run requires at least 1 argument` | A line break without `\` split the command. |
+| Agent secret leaked | Delete the node and create one with a new name. |
 
-## Security checklist
-
-- EC2 security group: allow `8080` **only from your IP**, plus GitHub's webhook IP ranges (the `hooks` list at https://api.github.com/meta) so push webhooks still arrive. Don't open `50000`; the agent connects over `jenkins-net`.
-- Never commit secrets. They live only in Jenkins credentials.
+**Security:** allow port `8080` only from your IP plus [GitHub's webhook ranges](https://api.github.com/meta) (`hooks`). Never open `50000`.
