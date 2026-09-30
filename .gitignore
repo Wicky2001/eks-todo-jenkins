@@ -2,6 +2,8 @@ node_modules
 dist
 build
 .env
+.env.*
+!.env.example
 .DS_Store
 coverage
 *.log
@@ -15,17 +17,28 @@ mongoose/node_modules
 
 terraform.tfstate
 terraform.tfstate.backup
+*.tfstate
+*.tfstate.*
 .terraform/
 terraform.tfvars
 *.tfvars
+*.tfvars.json
 
-k8s/secret.yaml
+# credentials / keys
 github-secrets.txt
 github-variables.txt
-backend-secret.yaml
-pub-cert.pem
+*accessKeys*.csv
+*.pem
+*.key
+*.p12
+*.pfx
+!k8s/app/pub-cert.pem
 
+# k8s secrets (SealedSecret manifests are safe to keep — plain Secret manifests are not)
+k8s/secret.yaml
+backend-secret.yaml
 email-secrets.yml
 secrets.yml
 secret.*
 secrets.*
+!**/*sealed-secret*.yaml
