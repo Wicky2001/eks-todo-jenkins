@@ -2,19 +2,17 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: a-service-service-monitor
     release: monitoring
-  name: a-service-service-monitor
+  name: serice-discovery-config
   namespace: monitoring
 spec:
-  jobLabel: job
   endpoints:
     - interval: 2s
-      port: a-service-port
+      port: backend
       path: /metrics
   selector:
     matchLabels:
-      app: a-service
+      app: backend
   namespaceSelector:
     matchNames:
-      - dev
+      - app
