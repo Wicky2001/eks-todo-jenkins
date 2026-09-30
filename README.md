@@ -1,6 +1,17 @@
 # EKS Todo — Jenkins CI/CD with SonarCloud Quality Gates
 
-A full-stack Todo app (React + Express + Mongoose/DocumentDB) used to demo **Jenkins pipelines** and **SonarCloud static analysis**. Every pull request is built by Jenkins and scanned by SonarCloud, and GitHub branch protection **blocks the merge** if the Quality Gate fails.
+A full-stack Todo app (React + Express + Mongoose/DocumentDB) used to demo **Jenkins pipelines**, **SonarCloud static analysis**, and a **GitOps deployment to Amazon EKS**. Every pull request is built by Jenkins and scanned by SonarCloud, and GitHub branch protection **blocks the merge** if the Quality Gate fails.
+
+## Architecture
+
+![EKS Todo architecture](screenshots/eks-todo-jenkins-architecture.png)
+
+- **Terraform** provisions the VPC (3 AZs), an **EKS 1.33** cluster and its add-ons, with state in **S3**
+- **Karpenter** scales nodes on demand instead of a fixed-size node group
+- **Argo CD** watches the `k8s/` manifests in this repo and syncs them into the cluster (GitOps — Jenkins never deploys directly)
+- An internet-facing **AWS Network Load Balancer** + **ingress-nginx** route traffic to the frontend, backend and migration workloads
+- **Prometheus**, **Fluent Bit** and **Jaeger** cover metrics, logs and traces for the backend
+- **Sealed Secrets** and the **AWS LB Controller** run as cluster add-ons managed by Karpenter
 
 ## Pipelines
 
