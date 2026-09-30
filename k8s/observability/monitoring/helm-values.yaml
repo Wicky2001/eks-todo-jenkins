@@ -4,7 +4,7 @@
 # create the required StorageClasses inside your Kubernetes cluster.
 #
 # Run this command first:
-#   kubectl apply -f storage_classes/values.yaml
+#   kubectl apply -f storage-classes.yaml
 #
 # Why? If you apply this Helm chart before creating those StorageClasses, 
 # your PersistentVolumeClaims (PVCs) will fail to discover the storage backend 
