@@ -8,25 +8,13 @@ const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 app.set("trust proxy", true);
-const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:8080';
 
+// In production the frontend and backend share one origin (the ingress), so no
+// CORS is needed. Locally they run on different ports, so enable it there only.
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors());
+}
 
-const whitelist = process.env.CORS_ORIGINS.split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-const corsOptions = {
-  credentials: true,
-  origin: function (origin, callback) {
-    if (!origin || whitelist.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not Allowed by CORS"));
-    }
-  },
-};
-
-app.use(cors(corsOptions));
 app.use(express.json());
 app.use(morgan('dev'));
 
