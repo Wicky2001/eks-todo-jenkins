@@ -16,7 +16,7 @@ resource "kubernetes_namespace_v1" "argocd_namespace" {
 }
 
 data "http" "argocd_manifest" {
-  url = "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
+  url = "https://raw.githubusercontent.com/argoproj/argo-cd/v3.5.3/manifests/install.yaml"
 }
 
 /*

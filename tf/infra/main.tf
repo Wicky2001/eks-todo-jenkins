@@ -6,6 +6,8 @@ terraform {
     bucket = "todo-cluster-terraform-state-677501681528"
     region = "us-east-1"
     key    = "todo-cluster.tfstate"
+
+    use_lockfile = true
   }
 
 
@@ -44,33 +46,9 @@ provider "aws" {
   profile = var.aws_profile
 }
 
-provider "aws" {
-  region  = "us-east-1"
-  alias   = "virginia"
-  profile = var.aws_profile
-}
-
-
 ###############################################################################
 # Data Sources
 ###############################################################################
-/* AUTHENTICATION NOTE:
-  We keep the 'aws_ecrpublic_authorization_token' data source even though the
-  Karpenter repo is public.
-
-  WHY?
-  AWS enforces strict anonymous rate limits on Public ECR. If we don't provide
-  an authentication token, AWS identifies us by our IP address. If we run
-  'terraform apply' multiple times (or run this in a shared CI/CD pipeline),
-  AWS will eventually block us with a '429 Too Many Requests' error.
-
-  Providing the token tells AWS we are a registered customer, which lifts
-  these limits and ensures our deployment remains 100% reliable.
-*/
-data "aws_ecrpublic_authorization_token" "token" {
-  provider = aws.virginia
-}
-
 data "aws_caller_identity" "current" {}
 
 
@@ -109,12 +87,6 @@ provider "helm" {
       args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
     }
   }
-
-  # registries = [{
-  #   url      = "oci://public.ecr.aws"
-  #   username = data.aws_ecrpublic_authorization_token.token.user_name
-  #   password = data.aws_ecrpublic_authorization_token.token.password
-  # }]
 }
 
 

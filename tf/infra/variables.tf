@@ -19,11 +19,3 @@ variable "cluster_name" {
 variable "project_name" {
   type = string
 }
-
-variable "master_username" {
-  type = string
-}
-
-variable "master_password" {
-  type = string
-}
