@@ -108,25 +108,25 @@ output "karpenter_interruption_queue" {
 
 output "frontend_ecr_repository_url" {
   description = "Frontend Docker image repository URL"
-  value       = aws_ecr_repository.frontend.repository_url
+  value       = module.ecr.frontend_repository_url
 }
 
 
 output "backend_ecr_repository_url" {
   description = "Backend Docker image repository URL"
-  value       = aws_ecr_repository.backend.repository_url
+  value       = module.ecr.backend_repository_url
 }
 
 
 output "migration_ecr_repository_url" {
   description = "Migration Docker image repository URL"
-  value       = aws_ecr_repository.migration.repository_url
+  value       = module.ecr.migration_repository_url
 }
 
 
 output "jenkins_iam_user_name" {
   description = "IAM user Jenkins uses to push to ECR (create its access key in the console)"
-  value       = aws_iam_user.jenkins.name
+  value       = module.ecr.jenkins_iam_user_name
 }
 
 
@@ -139,13 +139,13 @@ output "jenkins_iam_user_name" {
 
 output "application_namespace" {
   description = "Application namespace"
-  value       = kubernetes_namespace_v1.app_namespace.metadata[0].name
+  value       = module.argocd.application_namespace
 }
 
 
 output "argocd_namespace" {
   description = "ArgoCD namespace"
-  value       = kubernetes_namespace_v1.argocd_namespace.metadata[0].name
+  value       = module.argocd.argocd_namespace
 }
 
 
