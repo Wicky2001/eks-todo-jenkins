@@ -4,7 +4,7 @@
 terraform {
   backend "s3" {
     bucket = "terraform-backend-state-file-karpenter"
-    region = "ap-south-1"
+    region = "us-east-1"
     key    = "karpenter.tfstate"
   }
 
@@ -40,9 +40,8 @@ terraform {
 
 
 provider "aws" {
-  region              = var.region
-  allowed_account_ids = [var.aws_account_id]
-  profile             = var.aws_profile
+  region  = var.region
+  profile = var.aws_profile
 }
 
 provider "aws" {
@@ -71,6 +70,8 @@ provider "aws" {
 data "aws_ecrpublic_authorization_token" "token" {
   provider = aws.virginia
 }
+
+data "aws_caller_identity" "current" {}
 
 
 

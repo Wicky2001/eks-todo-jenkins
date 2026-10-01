@@ -2,9 +2,8 @@
 # Provider
 ###############################################################################
 provider "aws" {
-  region              = var.region
-  allowed_account_ids = [var.aws_account_id]
-  profile             = var.aws_profile
+  region  = var.region
+  profile = var.aws_profile
 }
 
 terraform {
@@ -15,6 +14,8 @@ terraform {
     }
   }
 }
+
+data "aws_caller_identity" "current" {}
 
 ###############################################################################
 # S3 Bucket
