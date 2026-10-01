@@ -3,7 +3,7 @@ kind: ServiceMonitor
 metadata:
   labels:
     release: monitoring
-  name: serice-discovery-config
+  name: backend-service-monitor
   namespace: monitoring
 spec:
   endpoints:

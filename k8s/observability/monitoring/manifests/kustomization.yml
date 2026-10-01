@@ -5,4 +5,4 @@ resources:
   - prometheus/alert-rules.yml
   - alertmanager/email-secrets.yml
   - alertmanager/alert-manager-config.yml
-  # - prometheus/service-monitor-backend.yml
+  - prometheus/service-monitor-rules.yml
