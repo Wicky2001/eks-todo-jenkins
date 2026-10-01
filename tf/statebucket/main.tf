@@ -21,7 +21,7 @@ data "aws_caller_identity" "current" {}
 # S3 Bucket
 ###############################################################################
 resource "aws_s3_bucket" "state" {
-  bucket        = "terraform-backend-state-file-karpenter"
+  bucket        = "todo-cluster-terraform-state-677501681528"
   force_destroy = true
 
 }

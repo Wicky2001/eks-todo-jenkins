@@ -17,6 +17,25 @@ grafana:
   # Sets the initial admin dashboard password. (Change this for production!)
   adminPassword: prom-operator
 
+  # Requests a dedicated, permanent AWS EBS disk for Grafana's /var/lib/grafana
+  # directory (its SQLite DB: custom dashboards, users, API keys, preferences).
+  # Without this, Grafana uses an emptyDir and loses all of that on every pod restart.
+  persistence:
+    enabled: true
+    type: pvc
+    # Binds this request to the custom gp3 storage class for Grafana.
+    storageClassName: grafana-sc
+    # Restricts the AWS EBS disk to be mounted and read/written by only 1 node at a time.
+    accessModes: ["ReadWriteOnce"]
+    # Allocates a physical 10 Gigabyte AWS EBS disk for Grafana's state.
+    size: 10Gi
+
+  # A ReadWriteOnce EBS volume can only attach to one node at a time. The default
+  # RollingUpdate strategy starts the new pod before the old one releases the disk,
+  # causing a Multi-Attach error. 'Recreate' tears down the old pod first.
+  deploymentStrategy:
+    type: Recreate
+
 # ─── ALERTMANAGER CONFIGURATION ──────────────────────────────────────
 # Configures the notification routing engine, which processes alerts sent by Prometheus.
 alertmanager:
@@ -53,7 +72,10 @@ alertmanager:
 # ─── PROMETHEUS CONFIGURATION ────────────────────────────────────────
 # Configures the core Prometheus engine, containing the core Time Series Database (TSDB).
 prometheus:
-  prometheusSpec:    
+  prometheusSpec:
+    serviceMonitorSelector:
+      matchLabels:
+        release: monitoring    
     ruleSelector:
       matchLabels:
         release: monitoring

@@ -52,11 +52,6 @@ output "cluster_version" {
   value       = module.eks.cluster_version
 }
 
-output "cluster_oidc_provider_arn" {
-  description = "OIDC provider ARN used for IAM Roles for Service Accounts"
-  value       = module.eks.oidc_provider_arn
-}
-
 output "cluster_certificate_authority_data" {
   description = "Cluster CA certificate"
   value       = module.eks.cluster_certificate_authority_data

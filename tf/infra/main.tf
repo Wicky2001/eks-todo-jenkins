@@ -3,9 +3,9 @@
 ###############################################################################
 terraform {
   backend "s3" {
-    bucket = "terraform-backend-state-file-karpenter"
+    bucket = "todo-cluster-terraform-state-677501681528"
     region = "us-east-1"
-    key    = "karpenter.tfstate"
+    key    = "todo-cluster.tfstate"
   }
 
 

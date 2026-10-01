@@ -30,25 +30,31 @@ resource "helm_release" "metrics_server" {
 
 
 
+###############################################################################
+# Pod Identity for AWS Load Balancer Controller
+###############################################################################
+
+module "aws_lb_controller_pod_identity" {
+  source = "terraform-aws-modules/eks-pod-identity/aws"
+
+  name = "${var.cluster_name}-aws-lb-controller-iam"
+
+  attach_aws_lb_controller_policy = true
+
+  associations = {
+    this = {
+      cluster_name    = var.cluster_name
+      namespace       = "kube-system"
+      service_account = "aws-load-balancer-controller-sa"
+    }
+  }
+
+  tags = {
+    Environment = "production"
+  }
+}
 
 
-
-
-# module "iam_iam-role-for-service-accounts" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts"
-#   version = "6.6.1"
-
-#   # Updated to match the v6.x variable list
-#   name                                   = "${var.cluster_name}-aws-lbc"
-#   attach_load_balancer_controller_policy = true
-
-#   oidc_providers = {
-#     main = {
-#       provider_arn               = module.eks.oidc_provider_arn
-#       namespace_service_accounts = ["kube-system:aws-load-balancer-controller"]
-#     }
-#   }
-# }
 
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
@@ -91,6 +97,8 @@ resource "helm_release" "aws_load_balancer_controller" {
       value = "aws-load-balancer-controller-sa"
     },
   ]
+
+  depends_on = [module.aws_lb_controller_pod_identity]
 
 }
 
