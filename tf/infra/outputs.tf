@@ -144,13 +144,48 @@ output "jenkins_iam_user_name" {
 
 output "application_namespace" {
   description = "Application namespace"
-  value       = module.argocd.application_namespace
+  value       = kubernetes_namespace_v1.app.metadata[0].name
 }
 
 
 output "argocd_namespace" {
   description = "ArgoCD namespace"
   value       = module.argocd.argocd_namespace
+}
+
+
+###############################################################################
+# Database Outputs
+###############################################################################
+
+output "db_endpoint" {
+  description = "RDS PostgreSQL address"
+  value       = module.rds.db_endpoint
+}
+
+output "db_name" {
+  description = "Database name"
+  value       = module.rds.db_name
+}
+
+output "db_user" {
+  description = "Database user the backend logs in as (IAM authentication, no password)"
+  value       = module.rds.db_user
+}
+
+output "db_master_username" {
+  description = "RDS admin user, only used by scripts/init-db-user.sh"
+  value       = module.rds.db_master_username
+}
+
+output "db_master_secret_arn" {
+  description = "Secrets Manager secret that holds the RDS admin password"
+  value       = module.rds.db_master_secret_arn
+}
+
+output "backend_iam_role_arn" {
+  description = "IAM role that only pods running as backend-sa can use"
+  value       = module.rds.backend_role_arn
 }
 
 

@@ -2,13 +2,6 @@
 # argo cd
 ###############################################################################
 
-resource "kubernetes_namespace_v1" "app_namespace" {
-  metadata {
-    name = "app"
-  }
-}
-
-
 resource "kubernetes_namespace_v1" "argocd_namespace" {
   metadata {
     name = "argocd"
@@ -61,11 +54,11 @@ resource "kubectl_manifest" "argocd" {
 resource "kubectl_manifest" "argocd_project" {
   yaml_body = file("${path.root}/../../k8s/argocd/argocd-project.yaml")
 
-  depends_on = [kubernetes_namespace_v1.app_namespace, kubectl_manifest.argocd]
+  depends_on = [kubectl_manifest.argocd]
 }
 
 resource "kubectl_manifest" "argocd_application" {
   yaml_body = file("${path.root}/../../k8s/argocd/argocd-app.yaml")
 
-  depends_on = [kubernetes_namespace_v1.app_namespace, kubectl_manifest.argocd_project]
+  depends_on = [kubectl_manifest.argocd_project]
 }

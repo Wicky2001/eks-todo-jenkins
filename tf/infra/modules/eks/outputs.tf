@@ -18,3 +18,7 @@ output "cluster_certificate_authority_data" {
 output "eks_managed_node_groups" {
   value = module.eks.eks_managed_node_groups
 }
+
+output "node_security_group_id" {
+  value = module.eks.node_security_group_id
+}

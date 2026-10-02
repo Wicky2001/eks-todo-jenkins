@@ -153,10 +153,29 @@ module "ecr" {
   project_name = var.project_name
 }
 
+resource "kubernetes_namespace_v1" "app" {
+  metadata {
+    name = "app"
+  }
+
+  depends_on = [module.eks]
+}
+
+module "rds" {
+  source = "./modules/rds"
+
+  cluster_name           = module.eks.cluster_name
+  region                 = var.region
+  vpc_id                 = module.vpc.vpc_id
+  private_subnets        = module.vpc.private_subnets
+  node_security_group_id = module.eks.node_security_group_id
+  app_namespace          = kubernetes_namespace_v1.app.metadata[0].name
+}
+
 module "argocd" {
   source = "./modules/argocd"
 
-  depends_on = [module.eks, module.karpenter]
+  depends_on = [module.eks, module.karpenter, module.rds]
 }
 
 module "monitoring" {
