@@ -1,38 +1,60 @@
-# EKS Todo
+# EKS Todo — Jenkins CI/CD with SonarCloud Quality Gates
 
-Monorepo scaffold for a simple todo app built with React, Express.js, and PostgreSQL (Amazon RDS in the cluster, a local container on your machine).
+A full-stack Todo app (React + Express + Mongoose/DocumentDB) used to demo **Jenkins pipelines**, **SonarCloud static analysis**, and a **GitOps deployment to Amazon EKS**. Every pull request is built by Jenkins and scanned by SonarCloud, and GitHub branch protection **blocks the merge** if the Quality Gate fails.
 
-## Structure
+## Architecture
 
-- `frontend` - React UI
-- `backend` - Express MVC API
-- `developmentTools/db` - local PostgreSQL Docker Compose setup
-- `migration` - migration scripts and runner
-- `scripts` - one-off helper scripts (for example, creating the database login user)
-- `tf` - Terraform for the AWS infrastructure
-- `k8s` - Kubernetes manifests
+![EKS Todo architecture](screenshots/eks-todo-jenkins-architecture.png)
 
-## Local setup
+- **Terraform** provisions the VPC (3 AZs), an **EKS 1.33** cluster and its add-ons, with state in **S3**
+- **Karpenter** scales nodes on demand instead of a fixed-size node group
+- **Argo CD** watches the `k8s/` manifests in this repo and syncs them into the cluster (GitOps — Jenkins never deploys directly)
+- An internet-facing **AWS Network Load Balancer** + **ingress-nginx** route traffic to the frontend, backend and migration workloads
+- **Prometheus**, **Fluent Bit** and **Jaeger** cover metrics, logs and traces for the backend
+- **Sealed Secrets** and the **AWS LB Controller** run as cluster add-ons managed by Karpenter
 
-1. Install dependencies from the repo root.
-2. Copy each `.env.example` file to `.env` in the matching folder (`backend`, `migration`).
-3. Start PostgreSQL with Docker Compose from `developmentTools/db`.
-4. Run the migrations: `npm run migrate`.
-5. Start the backend and frontend workspaces.
+## Pipelines
 
-Or run everything in containers with `docker compose up --build` from the repo root.
+| Job | Jenkinsfile | Trigger | Purpose |
+|---|---|---|---|
+| `eks-todo-jenkins` (multibranch) | [`Jenkinsfile.ci`](jenkins/Jenkinsfile.ci) | Pull requests | SonarCloud scan + build all 3 images (not pushed) |
+| `todo-backend` | [`Jenkinsfile.backend`](jenkins/Jenkinsfile.backend) | Push webhook | Build & push backend image when `backend/**` changes |
+| `todo-frontend` | [`Jenkinsfile.frontend`](jenkins/Jenkinsfile.frontend) | Push webhook | Build & push frontend image |
+| `todo-migrations` | [`Jenkinsfile.migration`](jenkins/Jenkinsfile.migration) | Push webhook | Build & push migration image when `mongoose/**` changes |
 
-## Database in the cluster
+All jobs run on a dedicated `docker` agent (`agent1`). Images are pushed to Docker Hub tagged `<short-sha>-<build-number>` and `latest`, using credentials from the Jenkins credential store.
 
-The backend and the migration job log in to Amazon RDS **without a password**. They run as the `backend-sa` ServiceAccount, which EKS Pod Identity links to an IAM role. The role may only call `rds-db:connect` for one database user, so only pods running as `backend-sa` can get a login token. After the first `terraform apply`, run `scripts/init-db-user.sh` once to create that database user.
+**How the gate is enforced:** Jenkins runs `sonar-scanner` (config in [`sonar-project.properties`](sonar-project.properties)) → SonarCloud posts a Quality Gate check on the PR → that check is **Required** in `main`'s branch protection, so a failed gate disables merging.
 
-## Documentation
+## Demo
 
-Read these in order if you have forgotten how the AWS permissions work:
+PR #3 adds [`backend/src/sonar-test-vulnerabilities.js`](backend/src/sonar-test-vulnerabilities.js), a test fixture with deliberate issues (hard-coded password, command injection, `eval`, MD5 hashing). It is not used by the app and must never reach `main`.
 
-1. [EKS Pod Identity (and why we do not use IRSA)](tf/infra/modules/eks/README.md): how a pod gets AWS permissions, what EKS injects, and where each piece lives.
-2. [How the backend logs in to RDS with IAM](tf/infra/modules/rds/README.md): the badge, keys and login note, the Signer, TLS, the init script and troubleshooting.
+**Jenkins folder and PR pipeline**
 
-## Notes for K8s practice
+![Jenkins folder home page](screenshots/folder%20home%20page.jpg)
+![Jenkins PR pipeline overview](screenshots/pipeline%20overview%20screenshot.jpg)
 
-This scaffold keeps the app split into separate frontend, backend, database tooling, and migration areas so it can later be mapped into Kubernetes Deployments, Services, and ConfigMaps without restructuring the codebase.
+**Quality Gate fails, and GitHub blocks the merge**
+
+![SonarQube Quality Gate failed in Jenkins](screenshots/qulity%20gate%20faild%20jenkins.jpg)
+![PR blocked because static analysis failed](screenshots/PR%20-%20blocked%20when%20static%20analysis%20faild.jpg)
+
+## Repository layout
+
+| Folder | Description |
+|---|---|
+| [`frontend/`](frontend) | React (Vite) UI served by nginx |
+| [`backend/`](backend) | Express REST API |
+| [`mongoose/`](mongoose) | Database migrations |
+| [`jenkins/`](jenkins) | Jenkinsfiles |
+| [`k8s/`](k8s) | Kubernetes manifests |
+| [`tf/`](tf) | Terraform for AWS / EKS |
+
+## Run locally
+
+```bash
+npm install
+# copy each *.env.example to *.env and adjust
+docker compose up
+```
