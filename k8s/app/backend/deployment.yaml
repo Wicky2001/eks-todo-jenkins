@@ -13,6 +13,7 @@ spec:
       labels:
         app: backend
     spec:
+      serviceAccountName: backend-sa
       containers:
         - name: backend-container
           image: 677501681528.dkr.ecr.us-east-1.amazonaws.com/eks-todo-backend:6a0fd9b42bea4a1c7c5110073abd92235f67d9f3
@@ -20,9 +21,9 @@ spec:
           ports:
             - containerPort: 8081
           envFrom:
-            - secretRef:
-                name: backend-secret
             - configMapRef:
                 name: backend-config-map
+            - configMapRef:
+                name: backend-db-config
 
 
