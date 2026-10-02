@@ -56,7 +56,7 @@ pipeline {
                 anyOf {
                     changeset "backend/**"
                     changeset "frontend/**"
-                    changeset "mongoose/**"
+                    changeset "migration/**"
                 }
             }
             steps {
@@ -103,12 +103,12 @@ pipeline {
         }
 
         stage('Migration') {
-            when { changeset "mongoose/**" }
+            when { changeset "migration/**" }
             environment {
                 IMAGE = "${ECR_REGISTRY}/eks-todo-migration:${IMAGE_TAG}"
             }
             steps {
-                sh 'docker build -f mongoose/Dockerfile -t $IMAGE .'
+                sh 'docker build -f migration/Dockerfile -t $IMAGE .'
                 sh 'docker push $IMAGE'
                 script { env.CHANGED_SERVICES = (env.CHANGED_SERVICES ?: '') + ' migration' }
             }

@@ -1,16 +1,15 @@
 services:
-  docdb:
-    image: ghcr.io/documentdb/documentdb/documentdb-local:latest
-    container_name: docdb
-    command:
-      - --username
-      - demo
-      - --password
-      - demo
+  db:
+    image: postgres:17-alpine
+    container_name: todo-db
+    environment:
+      - POSTGRES_USER=demo
+      - POSTGRES_PASSWORD=demo
+      - POSTGRES_DB=todos
     ports:
-      - '10260:10260'
+      - '5432:5432'
     volumes:
-      - docdb_data:/var/lib/documentdb
+      - pg_data:/var/lib/postgresql/data
 
 volumes:
-  docdb_data:
+  pg_data:

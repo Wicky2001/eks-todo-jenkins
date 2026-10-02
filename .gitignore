@@ -9,7 +9,7 @@ coverage
 frontend/node_modules
 frontend/dist
 backend/node_modules
-mongoose/node_modules
+migration/node_modules
 
 # terraform ignores
 

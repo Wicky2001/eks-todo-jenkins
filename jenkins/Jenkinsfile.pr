@@ -49,7 +49,7 @@ pipeline {
 
         stage('Build migration image') {
             steps {
-                sh 'docker build -f mongoose/Dockerfile -t eks-todo-migration:$IMG_TAG .'
+                sh 'docker build -f migration/Dockerfile -t eks-todo-migration:$IMG_TAG .'
             }
         }
     }

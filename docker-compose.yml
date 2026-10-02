@@ -1,22 +1,21 @@
 services:
   db:
-    image: ghcr.io/documentdb/documentdb/documentdb-local:latest
-    container_name: docdb
-    command:
-      - --username
-      - demo
-      - --password
-      - demo
+    image: postgres:17-alpine
+    container_name: todo-db
+    environment:
+      - POSTGRES_USER=demo
+      - POSTGRES_PASSWORD=demo
+      - POSTGRES_DB=todos
     ports:
-      - '10260:10260'
+      - '5432:5432'
     volumes:
-      - docdb_data:/var/lib/documentdb
+      - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/10260' || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U demo -d todos"]
       interval: 5s
       timeout: 3s
       retries: 10
-      start_period: 10s
+      start_period: 5s
 
   backend:
     build:
@@ -28,9 +27,15 @@ services:
       db:
         condition: service_healthy
     environment:
-      - MONGODB_URI=mongodb://demo:demo@db:10260/todos?authSource=admin&tls=true&tlsAllowInvalidCertificates=true&directConnection=true
-    env_file:
-      - ./backend/.env
+      - NODE_ENV=local
+      - PORT=8081
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=todos
+      - DB_USER=demo
+      - DB_PASSWORD=demo
+      - DB_IAM_AUTH=false
+      - DB_SSL=false
     ports:
       - "8081:8081"
 
@@ -46,24 +51,28 @@ services:
     depends_on:
       backend:
         condition: service_started
-       
+
     ports:
       - '8080:8080'
 
   migrate:
     build:
       context: .
-      dockerfile: mongoose/Dockerfile
+      dockerfile: migration/Dockerfile
     container_name: migrate-todo
     restart: "no"
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - MONGODB_URI=mongodb://demo:demo@db:10260/todos?authSource=admin&tls=true&tlsAllowInvalidCertificates=true&directConnection=true
-    env_file:
-      - ./mongoose/.env
-    
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=todos
+      - DB_USER=demo
+      - DB_PASSWORD=demo
+      - DB_IAM_AUTH=false
+      - DB_SSL=false
+
 
 volumes:
-  docdb_data:
+  pg_data:
