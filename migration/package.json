@@ -7,7 +7,8 @@
     "migrate": "node migrate.js"
   },
   "dependencies": {
+    "@aws-sdk/rds-signer": "^3.1144.0",
     "dotenv": "^16.4.5",
-    "mongoose": "^8.6.3"
+    "pg": "^8.23.1"
   }
 }

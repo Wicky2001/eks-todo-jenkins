@@ -4,11 +4,11 @@
   "workspaces": [
     "frontend",
     "backend",
-    "mongoose"
+    "migration"
   ],
   "scripts": {
     "frontend": "npm run dev --workspace frontend",
     "backend": "npm run dev --workspace backend",
-    "migrate": "npm run migrate --workspace mongoose"
+    "migrate": "npm run migrate --workspace migration"
   }
 }

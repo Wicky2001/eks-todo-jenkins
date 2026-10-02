@@ -8,7 +8,7 @@ const { resourceFromAttributes } = require("@opentelemetry/resources");
 const {SemanticResourceAttributes} = require("@opentelemetry/semantic-conventions");
 const { SimpleSpanProcessor } = require("@opentelemetry/sdk-trace-base");
 const { HttpInstrumentation } = require("@opentelemetry/instrumentation-http");
-const { MongoDBInstrumentation } = require("@opentelemetry/instrumentation-mongodb");
+const { PgInstrumentation } = require("@opentelemetry/instrumentation-pg");
 const {ExpressInstrumentation} = require("@opentelemetry/instrumentation-express");
 
 
@@ -46,7 +46,7 @@ try {
   // Initialize the provider and instrumentations
   provider.register();
 
-  // Automatic instrumentation for HTTP, Express, and MongoDB
+  // Automatic instrumentation for HTTP, Express, and PostgreSQL
   registerInstrumentations({
     instrumentations: [
       new HttpInstrumentation({
@@ -55,7 +55,7 @@ try {
         },
       }),
       new ExpressInstrumentation(), 
-      new MongoDBInstrumentation(),
+      new PgInstrumentation(),
     ],
   });
 

@@ -21,6 +21,10 @@ async function createTodo(request, response, next) {
       throw new AppError('Title is required',400);
     }
 
+    if (title.length > 160) {
+      throw new AppError('Title must be 160 characters or less',400);
+    }
+
     const todo = await todoService.createTodo(title);
     logger.info({ todo:todo }, 'Todo created successfully');
     response.status(201).json(todo);
@@ -34,8 +38,7 @@ async function toggleTodo(request, response, next) {
     const todo = await todoService.toggleTodo(request.params.id);
 
     if (!todo) {
-      response.status(404);
-      throw new Error('Todo not found');
+      throw new AppError('Todo not found',404);
     }
 
     response.json(todo);
@@ -49,8 +52,7 @@ async function removeTodo(request, response, next) {
     const removed = await todoService.deleteTodo(request.params.id);
 
     if (!removed) {
-      response.status(404);
-      throw new Error('Todo not found');
+      throw new AppError('Todo not found',404);
     }
 
     logger.info({ todoId:request.params.id }, 'Todo removed successfully');

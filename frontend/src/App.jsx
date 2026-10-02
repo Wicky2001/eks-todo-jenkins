@@ -88,7 +88,7 @@ function App() {
         throw new Error('Failed to delete todo');
       }
 
-      setTodos((currentTodos) => currentTodos.filter((todo) => todo._id !== todoId));
+      setTodos((currentTodos) => currentTodos.filter((todo) => todo.id !== todoId));
     } catch (requestError) {
       setError(requestError.message || 'Unable to delete todo');
     }
@@ -97,7 +97,7 @@ function App() {
   return (
     <main className="app-shell">
       <section className="hero-card">
-        <p className="eyebrow">React + Express + Mongoose + DocumentDB</p>
+        <p className="eyebrow">React + Express + PostgreSQL</p>
         <h1>Todo app scaffold for Kubernetes practice</h1>
         <p className="lede">
           A small full-stack app split into frontend, backend, database tooling, and migrations so each layer can be
@@ -131,12 +131,12 @@ function App() {
 
         <ul className="todo-list">
           {todos.map((todo) => (
-            <li key={todo._id} className={todo.completed ? 'todo-item completed' : 'todo-item'}>
+            <li key={todo.id} className={todo.completed ? 'todo-item completed' : 'todo-item'}>
               <label>
-                <input type="checkbox" checked={todo.completed} onChange={() => toggleTodo(todo._id)} />
+                <input type="checkbox" checked={todo.completed} onChange={() => toggleTodo(todo.id)} />
                 <span>{todo.title}</span>
               </label>
-              <button type="button" className="danger-button" onClick={() => deleteTodo(todo._id)}>
+              <button type="button" className="danger-button" onClick={() => deleteTodo(todo.id)}>
                 Delete
               </button>
             </li>

@@ -11,7 +11,7 @@ function required(name) {
   return value;
 }
 
-function buildPoolConfig() {
+function createPool() {
   const host = required('DB_HOST');
   const port = Number(process.env.DB_PORT || 5432);
   const user = required('DB_USER');
@@ -21,15 +21,13 @@ function buildPoolConfig() {
     port,
     user,
     database: required('DB_NAME'),
-    max: 10,
-    idleTimeoutMillis: 30000,
+    max: 1,
     connectionTimeoutMillis: 5000
   };
 
   if (process.env.DB_IAM_AUTH === 'true') {
-    // In the cluster there is no database password. The pod gets temporary AWS keys
+    // In the cluster there is no database password. The job gets temporary AWS keys
     // from EKS Pod Identity and signs a short-lived login token with them.
-    // The pool asks for a fresh token every time it opens a new connection.
     const { Signer } = require('@aws-sdk/rds-signer');
     const signer = new Signer({
       hostname: host,
@@ -47,31 +45,7 @@ function buildPoolConfig() {
     config.ssl = { ca: fs.readFileSync(required('DB_SSL_CA_FILE'), 'utf8') };
   }
 
-  return config;
+  return new Pool(config);
 }
 
-let pool;
-
-function getPool() {
-  if (!pool) {
-    pool = new Pool(buildPoolConfig());
-
-    pool.on('error', (error) => {
-      console.error('Idle database client error:', error.message);
-    });
-  }
-
-  return pool;
-}
-
-async function connectToDatabase() {
-  const activePool = getPool();
-
-  await activePool.query('SELECT 1');
-
-  return activePool;
-}
-
-module.exports = connectToDatabase;
-module.exports.getPool = getPool;
-module.exports.query = (text, params) => getPool().query(text, params);
+module.exports = { createPool };

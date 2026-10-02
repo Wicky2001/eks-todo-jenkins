@@ -1,28 +1,35 @@
 const Todo = require('../models/Todo');
 
-async function listTodos() {
-  return Todo.find().sort({ createdAt: -1 });
-}
+const MAX_ID = 2147483647;
 
-async function createTodo(title) {
-  return Todo.create({ title });
-}
-
-async function toggleTodo(todoId) {
-  const todo = await Todo.findById(todoId);
-
-  if (!todo) {
+function parseId(value) {
+  if (!/^\d+$/.test(String(value))) {
     return null;
   }
 
-  todo.completed = !todo.completed;
-  await todo.save();
+  const id = Number(value);
 
-  return todo;
+  return id <= MAX_ID ? id : null;
+}
+
+async function listTodos() {
+  return Todo.findAll();
+}
+
+async function createTodo(title) {
+  return Todo.create(title);
+}
+
+async function toggleTodo(todoId) {
+  const id = parseId(todoId);
+
+  return id === null ? null : Todo.toggle(id);
 }
 
 async function deleteTodo(todoId) {
-  return Todo.findByIdAndDelete(todoId);
+  const id = parseId(todoId);
+
+  return id === null ? null : Todo.remove(id);
 }
 
 module.exports = {

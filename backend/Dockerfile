@@ -21,6 +21,9 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
 
 COPY /backend ./backend
 
+# Amazon's CA bundle, so the backend can verify the RDS server certificate over TLS
+ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /app/certs/rds-global-bundle.pem
+
 USER nodejs
 EXPOSE 8081
 
