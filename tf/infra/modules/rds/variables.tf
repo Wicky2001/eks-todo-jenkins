@@ -24,12 +24,12 @@ variable "app_namespace" {
 
 variable "db_name" {
   type    = string
-  default = "todos"
+  default = "todo_app_db"
 }
 
 variable "db_username" {
   type    = string
-  default = "todo_app"
+  default = "todo_app_db_user"
 }
 
 variable "service_account_name" {

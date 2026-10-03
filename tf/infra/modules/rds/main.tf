@@ -66,8 +66,8 @@ resource "aws_db_instance" "this" {
 # IAM role for the backend pod (EKS Pod Identity)
 ###############################################################################
 
-# The role can do exactly one thing: ask for a login token for the "todo_app"
-# database user of this one database. Pod Identity gives the role only to pods
+# The role can do exactly one thing: ask for a login token for the "todo_app_db_user"
+# database user on this one database server. Pod Identity gives the role only to pods
 # that run as the backend ServiceAccount in the app namespace.
 module "backend_pod_identity" {
   source = "terraform-aws-modules/eks-pod-identity/aws"
