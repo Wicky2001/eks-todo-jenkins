@@ -2,15 +2,10 @@
 # Install prometheus stack via helm
 ###############################################################################
 
-# Apply storage classes for prometheus tsdb and alertmanager
-# 1. Read the multi-document YAML file and split it into individual manifests
-data "kubectl_file_documents" "storage_class_docs" {
-  content = file("${path.root}/../../k8s/observability/monitoring/storage-classes.yaml")
-}
 
-# 2. Loop through every split manifest block and apply them cleanly
+# 1. Read the multi-document YAML file and split it into individual manifests
 resource "kubectl_manifest" "prometheus_storage_classes" {
-  for_each  = data.kubectl_file_documents.storage_class_docs.manifests
+  for_each  = { for i, doc in split("---", file("${path.root}/../../k8s/observability/monitoring/storage-classes.yaml")) : i => doc if trimspace(doc) != "" }
   yaml_body = each.value
 }
 

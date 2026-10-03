@@ -176,13 +176,12 @@ module "rds" {
 module "argocd" {
   source = "./modules/argocd"
 
-  depends_on = [module.eks, module.karpenter, module.rds]
+
 }
 
 module "monitoring" {
   source = "./modules/monitoring"
 
-  depends_on = [module.eks, module.karpenter]
 }
 
 
