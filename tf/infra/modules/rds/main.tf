@@ -31,7 +31,7 @@ resource "aws_db_instance" "this" {
   identifier     = "${var.cluster_name}-postgres"
   engine         = "postgres"
   engine_version = "17"
-  instance_class = "db.t4g.micro"
+  instance_class = "db.t3.micro"
 
   allocated_storage = 20
   storage_type      = "gp3"
