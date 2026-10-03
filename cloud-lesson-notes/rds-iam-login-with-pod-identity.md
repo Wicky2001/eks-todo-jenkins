@@ -2,7 +2,7 @@
 
 This page explains how our backend pod connects to the PostgreSQL database in Amazon RDS **without any stored password**, and why only the backend can do it.
 
-It is written for someone who remembers nothing. It builds on [EKS Pod Identity](../eks/README.md), which explains the badge, the agent and the associations. Read that page first if the words "Pod Identity" or "ServiceAccount" are new.
+It is written for someone who remembers nothing. It builds on [EKS Pod Identity](eks-pod-identity-vs-irsa.md), which explains the badge, the agent and the associations. Read that page first if the words "Pod Identity" or "ServiceAccount" are new.
 
 > **Status when this was written:** the application code was tested against a real local PostgreSQL, the login-token code was tested against a fake agent, and `terraform validate` passes. The AWS parts (creating RDS, the real IAM login, `scripts/init-db-user.sh`) had **not yet been run on real AWS**. Remove this note once they have.
 
@@ -14,7 +14,7 @@ It is written for someone who remembers nothing. It builds on [EKS Pod Identity]
 2. The pod swaps the badge for temporary AWS **keys**.
 3. The **Signer** (a small library in our backend) uses the keys to write a **login note** that is valid for 15 minutes.
 4. The login note is sent to RDS **as the password**.
-5. RDS checks the note with AWS IAM and, if it is genuine, lets the pod in as the database user `todo_app`.
+5. RDS checks the note with AWS IAM and, if it is genuine, lets the pod in as the database user `todo_app_db_user`.
 
 No password is stored anywhere in Git, in Kubernetes or in the pod.
 
@@ -27,8 +27,8 @@ No password is stored anywhere in Git, in Kubernetes or in the pod.
 | **RDS** | Amazon's managed database service. AWS runs the server, we use it. |
 | **PostgreSQL** | The database software. RDS runs a version of it that AWS has extended. |
 | **Database server** | One RDS machine. It holds many databases and many database users. |
-| **Database** | A set of tables inside the server. Ours is called `todos`. |
-| **Database user** | A login name inside the server. We have `dbadmin` (the admin) and `todo_app` (used by the app). Do not mix these up with IAM users or roles: they are different things. |
+| **Database** | A set of tables inside the server. Ours is called `todo_app_db`. |
+| **Database user** | A login name inside the server. We have `dbadmin` (the admin) and `todo_app_db_user` (used by the app). Do not mix these up with IAM users or roles: they are different things. |
 | **IAM database authentication** | An RDS feature: instead of a password, a user logs in with a short-lived login note. Plain PostgreSQL does **not** have this. |
 | **`rds_iam`** | A special role that RDS adds. A user who has it can log in **only** with a login note, never with a password. |
 | **Signer** | A function from the AWS library `@aws-sdk/rds-signer`. It writes and signs the login note. |
@@ -44,9 +44,9 @@ flowchart TB
   BP["Backend pod<br/>runs as backend-sa<br/>has the backend role"]
   OP["Any other pod<br/>no role, no keys"]
   L1["Lock 1 - network<br/>security group: only the worker nodes can reach port 5432"]
-  L2["Lock 2 - identity<br/>only the backend role can make a login note for todo_app"]
-  L3["Lock 3 - database<br/>todo_app has no password and rights only in the todos database"]
-  DB[("todos database")]
+  L2["Lock 2 - identity<br/>only the backend role can make a login note for todo_app_db_user"]
+  L3["Lock 3 - database<br/>todo_app_db_user has no password and rights only in the todo_app_db database"]
+  DB[("todo_app_db")]
   NO["Login refused"]
   BP -->|"passes"| L1
   OP -->|"also passes: it runs on a worker node"| L1
@@ -58,20 +58,20 @@ flowchart TB
 
 | Lock | What it checks | Where it is defined |
 |---|---|---|
-| **1. Network** | Only traffic from the worker nodes may reach port 5432 | `aws_security_group.rds` and `aws_vpc_security_group_ingress_rule.from_nodes` in [`main.tf`](main.tf) |
-| **2. Identity** | Only the IAM role given to `backend-sa` may ask for a login note for `todo_app`, on this one server | module `backend_pod_identity` in [`main.tf`](main.tf) |
-| **3. Database** | `todo_app` has no password at all and only has rights inside `todos` | [`scripts/init-db-user.sh`](../../../../scripts/init-db-user.sh) |
+| **1. Network** | Only traffic from the worker nodes may reach port 5432 | `aws_security_group.rds` and `aws_vpc_security_group_ingress_rule.from_nodes` in [`main.tf`](../tf/infra/modules/rds/main.tf) |
+| **2. Identity** | Only the IAM role given to `backend-sa` may ask for a login note for `todo_app_db_user`, on this one server | module `backend_pod_identity` in [`main.tf`](../tf/infra/modules/rds/main.tf) |
+| **3. Database** | `todo_app_db_user` has no password at all and only has rights inside `todo_app_db` | [`scripts/init-db-user.sh`](../scripts/init-db-user.sh) |
 
 Be honest about lock 1: every pod runs on a worker node, so another pod **can** reach the port. It is lock 2 that stops it, because other pods have no role, cannot make a login note, and no password exists to guess. (A stricter network lock per pod would need "security groups for pods" or a Kubernetes NetworkPolicy.)
 
 What the IAM role really limits is **which server and which database user**. It does not name a database. The ARN in the policy looks like this:
 
 ```
-arn:aws:rds-db:us-east-1:ACCOUNT:dbuser:<server id>/todo_app
+arn:aws:rds-db:us-east-1:ACCOUNT:dbuser:<server id>/todo_app_db_user
                                          └ which server ┘ └ which user
 ```
 
-What `todo_app` may do **inside** the server is decided by PostgreSQL itself, through the grants in the init script. One detail: by default PostgreSQL lets any user connect to any database, so `todo_app` could open the built-in `postgres` database, but it has no rights on anything in it. Our server only holds `todos` anyway.
+What `todo_app_db_user` may do **inside** the server is decided by PostgreSQL itself, through the grants in the init script. One detail: by default PostgreSQL lets any user connect to any database, so `todo_app_db_user` could open the built-in `postgres` database, but it has no rights on anything in it. Our server only holds `todo_app_db` anyway.
 
 ---
 
@@ -119,7 +119,7 @@ sequenceDiagram
   Pod->>RDS: 7. login note as the password (encrypted with TLS)
   RDS->>AWS: 8. is this note real, and is the role allowed?
   AWS-->>RDS: 9. yes, allowed
-  RDS-->>Pod: 10. logged in as todo_app
+  RDS-->>Pod: 10. logged in as todo_app_db_user
 ```
 
 Reading the diagram:
@@ -136,8 +136,8 @@ Reading the diagram:
 
 The backend and the migration job both read these settings and build the connection the same way.
 
-- Backend: [`backend/src/config/db.js`](../../../../backend/src/config/db.js)
-- Migration job: [`migration/db.js`](../../../../migration/db.js)
+- Backend: [`backend/src/config/db.js`](../backend/src/config/db.js)
+- Migration job: [`migration/db.js`](../migration/db.js)
 
 The important part:
 
@@ -155,7 +155,7 @@ if (process.env.DB_IAM_AUTH === 'true') {
 You give the Signer four facts (server address, port, database user, region). `getAuthToken()` then:
 
 1. asks the AWS SDK for keys (the SDK uses the env vars and the badge, steps 1 to 5 above), and
-2. uses the secret key to **sign** a note saying "let `todo_app` log in to this server for 15 minutes".
+2. uses the secret key to **sign** a note saying "let `todo_app_db_user` log in to this server for 15 minutes".
 
 "Signing" works like a signature on paper: only the pod has the secret key, so the signature proves the note really came from it. AWS can check it later.
 
@@ -163,15 +163,15 @@ You give the Signer four facts (server address, port, database user, region). `g
 
 ## 7. What the database does with the login note
 
-Plain PostgreSQL has no idea what IAM is. It only compares passwords. **RDS is AWS's extended version.** When IAM login is switched on (`iam_database_authentication_enabled = true` in [`main.tf`](main.tf)), RDS adds the `rds_iam` role. For a user that has this role, RDS does **not** compare a stored password. It treats whatever you send as a login note and checks it with AWS IAM:
+Plain PostgreSQL has no idea what IAM is. It only compares passwords. **RDS is AWS's extended version.** When IAM login is switched on (`iam_database_authentication_enabled = true` in [`main.tf`](../tf/infra/modules/rds/main.tf)), RDS adds the `rds_iam` role. For a user that has this role, RDS does **not** compare a stored password. It treats whatever you send as a login note and checks it with AWS IAM:
 
 - Is the note genuine and not expired?
-- Is the role that signed it allowed `rds-db:connect` as this user (the policy in [`main.tf`](main.tf))?
+- Is the role that signed it allowed `rds-db:connect` as this user (the policy in [`main.tf`](../tf/infra/modules/rds/main.tf))?
 
 RDS decides by **which user** is logging in, not by looking at the text. A normal user without `rds_iam` would still use a password.
 
-- `todo_app` has `rds_iam`, so it logs in only with a login note.
-- `dbadmin` was created by RDS with a password kept in AWS Secrets Manager. It never got `rds_iam`, so it logs in with that password. This is deliberate: someone has to be able to create `todo_app` in the first place, and it is your way back in if IAM login ever breaks.
+- `todo_app_db_user` has `rds_iam`, so it logs in only with a login note.
+- `dbadmin` was created by RDS with a password kept in AWS Secrets Manager. It never got `rds_iam`, so it logs in with that password. This is deliberate: someone has to be able to create `todo_app_db_user` in the first place, and it is your way back in if IAM login ever breaks.
 
 Turning IAM login on for the server is therefore **not** "IAM is the only way in". It only makes IAM login *possible*. Which users use it is decided user by user.
 
@@ -181,12 +181,12 @@ The backend's IAM role cannot read the admin password: its only permission is `r
 
 ### Limits and cautions (from the AWS documentation)
 
-- **Memory.** AWS says IAM login needs roughly **300 to 1000 MiB of extra memory** on the database server for reliable connections, and warns burstable instances to watch for running out. Our `db.t4g.micro` has only 1 GiB in total. If logins become flaky or the database restarts, a bigger instance class (`db.t4g.small` or larger, set `instance_class` in [`main.tf`](main.tf)) is the first thing to try.
+- **Memory.** AWS says IAM login needs roughly **300 to 1000 MiB of extra memory** on the database server for reliable connections, and warns burstable instances to watch for running out. Our `db.t4g.micro` has only 1 GiB in total. If logins become flaky or the database restarts, a bigger instance class (`db.t4g.small` or larger, set `instance_class` in [`main.tf`](../tf/infra/modules/rds/main.tf)) is the first thing to try.
 - **Never give `rds_iam` to `dbadmin`.** For PostgreSQL, a user who has it **must** log in with a login note and can no longer use the password, even the master user. That would remove the way back in.
 - **An AWS administrator can also make a note.** Anyone with AWS administrator permissions can reach the database without being named in the policy. The three locks protect against **pods**, not against your own admin account.
 - **Auditing.** CloudWatch and CloudTrail do not log IAM database logins, so do not rely on them to see who connected.
 - **Use the real RDS address.** The login note is made for the exact server address, so a custom DNS name (for example a Route 53 record) will not work as `DB_HOST`.
-- **Access stays limited to what the database user can do.** AWS confirms that a role that logs in as `todo_app` can reach only what `todo_app` can reach.
+- **Access stays limited to what the database user can do.** AWS confirms that a role that logs in as `todo_app_db_user` can reach only what `todo_app_db_user` can reach.
 
 ---
 
@@ -198,7 +198,7 @@ The backend's IAM role cannot read the admin password: its only permission is `r
 
 **How the database proves itself.** It is the same as a website. During the connection the database sends its **certificate**, signed by an Amazon authority. The backend checks that signature against a list of authorities it trusts, following the chain upward until it reaches one that is on the list. A browser does this with its built-in list.
 
-**The list is a file we ship in the image.** Node's built-in trusted list does not include Amazon's database authorities, so we give it this file: `rds-global-bundle.pem`. It is downloaded from Amazon when the Docker image is built (an `ADD` line in [`backend/Dockerfile`](../../../../backend/Dockerfile) and [`migration/Dockerfile`](../../../../migration/Dockerfile)) and stored inside the image at `/app/certs/rds-global-bundle.pem`. Nothing is installed on your computer, and locally (`DB_SSL=false`) it is not used. It plays the same role as the cluster CA certificate in your kubeconfig.
+**The list is a file we ship in the image.** Node's built-in trusted list does not include Amazon's database authorities, so we give it this file: `rds-global-bundle.pem`. It is downloaded from Amazon when the Docker image is built (an `ADD` line in [`backend/Dockerfile`](../backend/Dockerfile) and [`migration/Dockerfile`](../migration/Dockerfile)) and stored inside the image at `/app/certs/rds-global-bundle.pem`. Nothing is installed on your computer, and locally (`DB_SSL=false`) it is not used. It plays the same role as the cluster CA certificate in your kubeconfig.
 
 ```mermaid
 flowchart LR
@@ -214,21 +214,21 @@ flowchart LR
 
 | Thing | Created by | Where |
 |---|---|---|
-| RDS server, security group, subnets | Terraform | [`main.tf`](main.tf) (`aws_db_instance.this` and friends) |
-| The admin user `dbadmin` and its password | RDS itself (password kept in Secrets Manager) | `manage_master_user_password = true` in [`main.tf`](main.tf) |
-| The IAM role, its permission and the association | Terraform (the `eks-pod-identity` module) | module `backend_pod_identity` in [`main.tf`](main.tf) |
-| The ServiceAccount `backend-sa` | Argo CD, from Git | [`k8s/app/backend/service-account.yaml`](../../../../k8s/app/backend/service-account.yaml) |
-| The connection settings (`backend-db-config` ConfigMap) | Terraform (the database address only exists after RDS is built) | `kubernetes_config_map_v1.backend_db` in [`main.tf`](main.tf) |
-| **The database user `todo_app`** | **A script you run once** | [`scripts/init-db-user.sh`](../../../../scripts/init-db-user.sh) |
+| RDS server, security group, subnets | Terraform | [`main.tf`](../tf/infra/modules/rds/main.tf) (`aws_db_instance.this` and friends) |
+| The admin user `dbadmin` and its password | RDS itself (password kept in Secrets Manager) | `manage_master_user_password = true` in [`main.tf`](../tf/infra/modules/rds/main.tf) |
+| The IAM role, its permission and the association | Terraform (the `eks-pod-identity` module) | module `backend_pod_identity` in [`main.tf`](../tf/infra/modules/rds/main.tf) |
+| The ServiceAccount `backend-sa` | Argo CD, from Git | [`k8s/app/backend/service-account.yaml`](../k8s/app/backend/service-account.yaml) |
+| The connection settings (`backend-db-config` ConfigMap) | Terraform (the database address only exists after RDS is built) | `kubernetes_config_map_v1.backend_db` in [`main.tf`](../tf/infra/modules/rds/main.tf) |
+| **The database user `todo_app_db_user`** | **A script you run once** | [`scripts/init-db-user.sh`](../scripts/init-db-user.sh) |
 
-The IAM policy only contains the **name** `todo_app` as text. It does not create the user. That is why the script exists. The name is written in one place and flows to three:
+The IAM policy only contains the **name** `todo_app_db_user` as text. It does not create the user. That is why the script exists. The name is written in one place and flows to three:
 
 ```mermaid
 flowchart TB
-  V["variables.tf<br/>db_username = todo_app"]
-  A["IAM policy<br/>may log in as todo_app<br/>(AWS side)"]
-  C["ConfigMap<br/>DB_USER = todo_app<br/>(pod side)"]
-  S["init script<br/>CREATE ROLE todo_app<br/>(database side)"]
+  V["variables.tf<br/>db_username = todo_app_db_user"]
+  A["IAM policy<br/>may log in as todo_app_db_user<br/>(AWS side)"]
+  C["ConfigMap<br/>DB_USER = todo_app_db_user<br/>(pod side)"]
+  S["init script<br/>CREATE ROLE todo_app_db_user<br/>(database side)"]
   V --> A
   V --> C
   V --> S
@@ -260,9 +260,9 @@ What the SQL does:
 
 | SQL | Meaning |
 |---|---|
-| `CREATE ROLE todo_app WITH LOGIN` | creates the user **with no password** |
-| `GRANT rds_iam TO todo_app` | makes it a login-note-only user |
-| `GRANT ALL ON SCHEMA public TO todo_app` | lets it create and use tables inside `todos` (the script connects to `todos`) |
+| `CREATE ROLE todo_app_db_user WITH LOGIN` | creates the user **with no password** |
+| `GRANT rds_iam TO todo_app_db_user` | makes it a login-note-only user |
+| `GRANT ALL ON SCHEMA public TO todo_app_db_user` | lets it create and use tables inside `todo_app_db` (the script connects to `todo_app_db`) |
 
 Which identity does what:
 
@@ -284,10 +284,10 @@ The same code runs in both. Only the settings differ.
 |---|---|---|
 | `DB_HOST` | `db` (the container) | the RDS address, from the ConfigMap `backend-db-config` |
 | `DB_PORT` | `5432` | `5432` |
-| `DB_NAME` | `todos` | `todos` |
-| `DB_USER` | `demo` | `todo_app` |
+| `DB_NAME` | `todos` | `todo_app_db` |
+| `DB_USER` | `demo` | `todo_app_db_user` |
 | `DB_PASSWORD` | `demo` | **not set** |
-| `DB_IAM_AUTH` | `false` | `true` ([`k8s/app/backend/config-map.yaml`](../../../../k8s/app/backend/config-map.yaml)) |
+| `DB_IAM_AUTH` | `false` | `true` ([`k8s/app/backend/config-map.yaml`](../k8s/app/backend/config-map.yaml)) |
 | `DB_SSL` | `false` | `true` |
 | `DB_SSL_CA_FILE` | not needed | `/app/certs/rds-global-bundle.pem` |
 | `AWS_REGION` | not needed | `us-east-1` (ConfigMap `backend-db-config`) |
@@ -312,6 +312,8 @@ flowchart LR
   E --> F["6. Argo CD deploys the app<br/>and runs the migration job"]
 ```
 
+Create the AWS profile first: `aws configure --profile terraform-user`. Terraform (state backend and providers), the init script and kubectl are all pinned to that profile name, so a different `AWS_PROFILE` set in your terminal no longer matters.
+
 ```bash
 cd tf/statebucket && terraform init && terraform apply
 cd ../infra && terraform init && terraform apply
@@ -319,7 +321,7 @@ aws eks update-kubeconfig --region us-east-1 --name todo-cluster --profile terra
 bash scripts/init-db-user.sh      # run once, from the repo root
 ```
 
-If Argo CD ran the migration job **before** step 4, it failed because `todo_app` did not exist yet. Delete it so Argo CD recreates it:
+If Argo CD ran the migration job **before** step 4, it failed because `todo_app_db_user` did not exist yet. Delete it so Argo CD recreates it:
 
 ```bash
 kubectl delete job migrate-db -n app

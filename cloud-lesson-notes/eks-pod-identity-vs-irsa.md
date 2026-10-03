@@ -4,7 +4,7 @@ This page explains how a pod in our cluster gets permission to use AWS services,
 
 It is written for someone who remembers nothing. Read it top to bottom once, and use the glossary when a word is unfamiliar.
 
-The next page builds on this one: [How the backend logs in to RDS with IAM](../rds/README.md).
+The next page builds on this one: [How the backend logs in to RDS with IAM](rds-iam-login-with-pod-identity.md).
 
 ---
 
@@ -198,7 +198,7 @@ Remove the ID-card check. Instead, **EKS itself vouches for the pod**, because E
 
 There are two parts:
 
-1. **The agent** (EKS add-on `eks-pod-identity-agent`). It runs on every node. We install it in [`main.tf`](main.tf).
+1. **The agent** (EKS add-on `eks-pod-identity-agent`). It runs on every node. We install it in [`main.tf`](../tf/infra/modules/eks/main.tf).
 2. **An association**: a rule stored in EKS that says "ServiceAccount `X` in namespace `Y` on cluster `Z` gets role `R`".
 
 ### The role's trust policy is short and the same everywhere
@@ -246,7 +246,7 @@ The association only stores **names**. It does not create the ServiceAccount, an
 | CoreDNS (`kube-system`, ServiceAccount `coredns`) | No, different ServiceAccount |
 | A pod in `app` using a ServiceAccount with the same name | No, different namespace |
 
-The ServiceAccount itself is created by whoever installs the software: the EBS add-on creates `ebs-csi-controller-sa`, the Helm chart creates `aws-load-balancer-controller-sa`, and we write `backend-sa` ourselves in [`k8s/app/backend/service-account.yaml`](../../../../k8s/app/backend/service-account.yaml).
+The ServiceAccount itself is created by whoever installs the software: the EBS add-on creates `ebs-csi-controller-sa`, the Helm chart creates `aws-load-balancer-controller-sa`, and we write `backend-sa` ourselves in [`k8s/app/backend/service-account.yaml`](../k8s/app/backend/service-account.yaml).
 
 ### What EKS puts in the pod (and what it does not)
 
@@ -312,12 +312,12 @@ Honest caveats:
 
 | Who needs AWS permission | ServiceAccount (namespace) | Defined in |
 |---|---|---|
-| EBS CSI driver (creates disks) | `ebs-csi-controller-sa` (`kube-system`) | [`main.tf`](main.tf): module `aws_ebs_csi_pod_identity`, plus `pod_identity_association` on the `aws-ebs-csi-driver` add-on |
-| AWS Load Balancer Controller | `aws-load-balancer-controller-sa` (`kube-system`) | [`../addons/main.tf`](../addons/main.tf): module `aws_lb_controller_pod_identity` |
-| Karpenter (starts EC2 servers) | `karpenter` (`kube-system`) | [`../karpenter/main.tf`](../karpenter/main.tf): `create_pod_identity_association = true` |
-| Backend and migration job (log in to RDS) | `backend-sa` (`app`) | [`../rds/main.tf`](../rds/main.tf): module `backend_pod_identity` |
+| EBS CSI driver (creates disks) | `ebs-csi-controller-sa` (`kube-system`) | [`main.tf`](../tf/infra/modules/eks/main.tf): module `aws_ebs_csi_pod_identity`, plus `pod_identity_association` on the `aws-ebs-csi-driver` add-on |
+| AWS Load Balancer Controller | `aws-load-balancer-controller-sa` (`kube-system`) | [`../addons/main.tf`](../tf/infra/modules/addons/main.tf): module `aws_lb_controller_pod_identity` |
+| Karpenter (starts EC2 servers) | `karpenter` (`kube-system`) | [`../karpenter/main.tf`](../tf/infra/modules/karpenter/main.tf): `create_pod_identity_association = true` |
+| Backend and migration job (log in to RDS) | `backend-sa` (`app`) | [`../rds/main.tf`](../tf/infra/modules/rds/main.tf): module `backend_pod_identity` |
 
-The agent itself is the `eks-pod-identity-agent` add-on in [`main.tf`](main.tf) (`before_compute = true`, so it exists before the first worker node starts).
+The agent itself is the `eks-pod-identity-agent` add-on in [`main.tf`](../tf/infra/modules/eks/main.tf) (`before_compute = true`, so it exists before the first worker node starts).
 
 ---
 
