@@ -17,17 +17,17 @@ module "vpc" {
 
   # Private subnets: The "inside of the house." Instances here cannot be reached from the internet,
   # but they can "look out the window" to download updates via a NAT Gateway.
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  private_subnets = ["10.0.0.0/20", "10.0.16.0/20"]
 
   # Public subnets: The "front yard." Instances here have direct access to the public internet,
   # typically used for public-facing entry points.
-  public_subnets = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  public_subnets = ["10.0.32.0/20", "10.0.48.0/20"]
 
   # Intra subnets: The "sealed safe room." These have zero access to the outside internet,
   # not even for updates. EKS needs these to securely house the network cables (ENIs)
   # that connect the Kubernetes 'brain' (Control Plane) to your worker nodes,
   # ensuring that no external traffic can ever reach the control plane infrastructure.
-  intra_subnets = ["10.0.104.0/24", "10.0.105.0/24", "10.0.106.0/24"]
+  intra_subnets = ["10.0.64.0/20", "10.0.80.0/20"]
 
   # Enable the NAT Gateway so private instances can reach out to the internet for updates
   enable_nat_gateway = true
@@ -57,3 +57,4 @@ module "vpc" {
     "karpenter.sh/discovery" = var.cluster_name
   }
 }
+

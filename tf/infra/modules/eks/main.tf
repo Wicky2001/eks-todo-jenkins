@@ -90,8 +90,8 @@ module "eks" {
       instance_types = ["c7i-flex.large"]
 
       min_size     = 1
-      max_size     = 2
-      desired_size = 1
+      max_size     = 4
+      desired_size = 2
 
       taints = {
         # This Taint aims to keep just EKS Addons and Karpenter running on this MNG
