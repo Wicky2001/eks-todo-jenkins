@@ -113,7 +113,7 @@ resource "helm_release" "ingress-nginx" {
   namespace        = "ingress-nginx"
   create_namespace = true
   version          = "4.15.1"
-  values           = [file("${path.root}/../../k8s/helm_config/helm-nginx-cofiguration.yaml")]
+  values           = [file("${path.module}/nginx-ingress-controller-helm-values.yaml")]
 
   depends_on = [helm_release.aws_load_balancer_controller]
 
