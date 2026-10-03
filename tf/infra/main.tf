@@ -3,9 +3,10 @@
 ###############################################################################
 terraform {
   backend "s3" {
-    bucket = "todo-cluster-terraform-state-677501681528"
-    region = "us-east-1"
-    key    = "todo-cluster.tfstate"
+    bucket  = "todo-cluster-terraform-state-677501681528"
+    region  = "us-east-1"
+    key     = "todo-cluster.tfstate"
+    profile = "terraform-user"
 
     use_lockfile = true
   }
@@ -60,7 +61,7 @@ provider "kubernetes" {
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
   }
 }
 
@@ -84,7 +85,7 @@ provider "helm" {
        allowing Terraform to safely authenticate and install Helm charts.
 
       */
-      args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+      args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
     }
   }
 }
@@ -109,7 +110,7 @@ provider "kubectl" {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
     # This requires the awscli to be installed locally where Terraform is executed
-    args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
   }
 }
 

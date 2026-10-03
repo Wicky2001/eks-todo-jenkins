@@ -13,7 +13,9 @@
 
 set -euo pipefail
 
-export AWS_PROFILE="${AWS_PROFILE:-terraform-user}"
+# Always use the terraform-user profile, even if your terminal has another AWS_PROFILE set.
+# Terraform, the aws command below and kubectl all pick it up from here.
+export AWS_PROFILE="terraform-user"
 
 cd "$(dirname "$0")/../tf/infra"
 

@@ -6,7 +6,8 @@ variable "region" {
 }
 
 variable "aws_profile" {
-  type = string
+  type    = string
+  default = "terraform-user"
 }
 
 ###############################################################################
