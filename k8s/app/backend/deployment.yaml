@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: backend-deployment
   namespace: app
+  annotations:
+    # Wave 0: updated only after the migration Job (wave -1) is Complete.
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   replicas: 2
   selector:

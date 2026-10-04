@@ -3,6 +3,9 @@ kind: ConfigMap
 metadata:
   name: backend-config-map
   namespace: app
+  annotations:
+    # Wave -2: the migration Job (wave -1) reads these settings, so they must exist first.
+    argocd.argoproj.io/sync-wave: "-2"
 data:
   PORT: "8081"
   NODE_ENV: "production"
