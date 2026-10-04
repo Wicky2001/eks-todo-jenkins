@@ -6,7 +6,7 @@ metadata:
   namespace: app
   annotations:
     # "cert-manager, please get a certificate for this Ingress from this supplier"
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    cert-manager.io/cluster-issuer: letsencrypt-prod
 
 spec:
   ingressClassName: nginx
