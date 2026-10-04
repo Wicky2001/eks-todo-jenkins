@@ -4,12 +4,22 @@ kind: Ingress
 metadata:
   name: app-ingress-resource
   namespace: app
+  annotations:
+    # "cert-manager, please get a certificate for this Ingress from this supplier"
+    cert-manager.io/cluster-issuer: letsencrypt-staging
 
 spec:
   ingressClassName: nginx
 
+  # HTTPS for this name. The certificate will be saved in the Secret "todo-tls".
+  tls:
+    - hosts:
+        - todo.jawsigt.online
+      secretName: todo-tls
+
   rules:
-    - http:
+    - host: todo.jawsigt.online
+      http:
         paths:
           - path: /
             pathType: Prefix
@@ -26,6 +36,7 @@ spec:
                 name: backend-service
                 port:
                   number: 8081
+
           - path: /health
             pathType: Prefix
             backend:
