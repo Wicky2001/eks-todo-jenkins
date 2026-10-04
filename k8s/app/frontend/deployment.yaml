@@ -20,5 +20,5 @@ spec:
         - name: frontend-container
           ports:
             - containerPort: 8080
-          image: 677501681528.dkr.ecr.us-east-1.amazonaws.com/eks-todo-frontend:ca356732a982c7e1936b43ead923094ec8f4d71d
+          image: 677501681528.dkr.ecr.us-east-1.amazonaws.com/eks-todo-frontend:244890720344f909dce2f5748c7ee7e842a6d766
           imagePullPolicy: Always
