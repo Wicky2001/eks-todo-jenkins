@@ -7,6 +7,10 @@ metadata:
     # A Job's pod template is immutable, so a new image tag can't be applied
     # in place. This tells Argo CD to delete and recreate the Job instead.
     argocd.argoproj.io/sync-options: Force=true,Replace=true
+    # Wave -1 runs before wave 0 (the backend and frontend). Argo CD waits until this
+    # Job is Complete before it updates the backend. An unchanged, completed Job is
+    # skipped, so the migration only runs again when this file changes.
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   backoffLimit: 1
   template:
