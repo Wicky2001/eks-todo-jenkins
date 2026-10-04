@@ -40,6 +40,25 @@ PR #3 adds [`backend/src/sonar-test-vulnerabilities.js`](backend/src/sonar-test-
 ![SonarQube Quality Gate failed in Jenkins](screenshots/qulity%20gate%20faild%20jenkins.jpg)
 ![PR blocked because static analysis failed](screenshots/PR%20-%20blocked%20when%20static%20analysis%20faild.jpg)
 
+## Deploy order: migration before backend
+
+The database migration runs as a Kubernetes **Job** (it runs once and stops), not a Deployment (which runs forever). The new backend must only start after the migration has finished.
+
+Argo CD has two ways to run something first:
+
+| | **Sync wave** (used here) | **PreSync hook** |
+|---|---|---|
+| Setting | `argocd.argoproj.io/sync-wave: "-1"` | `argocd.argoproj.io/hook: PreSync` |
+| What it does | Argo CD applies resources in waves, lowest number first, and waits until a wave is healthy before starting the next. A Job is healthy when it is Complete. | Argo CD runs the Job at the start of **every** sync, before anything else. |
+| When the migration runs | only when [`migration-job.yaml`](k8s/app/migration/migration-job.yaml) changes (a new migration image) | on every deploy, even a backend-only or frontend-only change |
+
+```
+Wave -1   migration Job        → Argo CD waits until it is Complete
+Wave  0   backend + frontend   → updated only after that
+```
+
+**Why a sync wave:** a backend-only change should not re-run the migration. Jenkins only edits `migration-job.yaml` when `migration/**` changes, so an unchanged Job stays Complete and Argo CD moves straight on to the backend. If a migration fails, Argo CD stops and the old backend keeps running. Re-running would still be safe, because [`migrate.js`](migration/migrate.js) records applied files in a `migrations` table and skips them.
+
 ## Repository layout
 
 | Folder | Description |
