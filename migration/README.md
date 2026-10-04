@@ -19,3 +19,5 @@ To revert everything: `npm run migrate --workspace migration -- down`
 ## In the cluster
 
 The same image runs as the `migrate-db` Job. It has no password: it logs in to RDS with a short-lived token signed by the `backend-sa` ServiceAccount's IAM role (EKS Pod Identity).
+
+initial build
