@@ -16,7 +16,7 @@ pipeline {
     parameters {
         string(
             name: 'VITE_API_BASE_URL',
-            defaultValue: 'http://localhost:8081',
+            defaultValue: '',
             description: 'Base URL of the backend API, baked into the frontend build'
         )
     }

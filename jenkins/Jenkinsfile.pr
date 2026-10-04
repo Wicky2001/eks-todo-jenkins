@@ -43,7 +43,7 @@ pipeline {
 
         stage('Build frontend image') {
             steps {
-                sh 'docker build -f frontend/Dockerfile --build-arg VITE_API_BASE_URL="http://localhost:8081" -t eks-todo-frontend:$IMG_TAG .'
+                sh 'docker build -f frontend/Dockerfile --build-arg VITE_API_BASE_URL='' -t eks-todo-frontend:$IMG_TAG .'
             }
         }
 
