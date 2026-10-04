@@ -144,3 +144,42 @@ resource "helm_release" "sealed_secrets" {
   ]
 
 }
+
+
+###############################################################################
+# cert-manager: gets HTTPS certificates from Let's Encrypt and renews them
+###############################################################################
+resource "helm_release" "cert_manager" {
+  name             = "cert-manager"
+  repository       = "https://charts.jetstack.io"
+  chart            = "cert-manager"
+  namespace        = "cert-manager"
+  create_namespace = true
+  version          = "v1.18.2"
+
+  values = [
+    yamlencode({
+      # Installs cert-manager's own resource types (Certificate, ClusterIssuer, ...)
+      crds = { enabled = true }
+
+      # Allow its pods on the node group that only accepts add-ons
+      tolerations     = [{ key = "CriticalAddonsOnly", operator = "Exists", effect = "NoSchedule" }]
+      webhook         = { tolerations = [{ key = "CriticalAddonsOnly", operator = "Exists", effect = "NoSchedule" }] }
+      cainjector      = { tolerations = [{ key = "CriticalAddonsOnly", operator = "Exists", effect = "NoSchedule" }] }
+      startupapicheck = { tolerations = [{ key = "CriticalAddonsOnly", operator = "Exists", effect = "NoSchedule" }] }
+    })
+  ]
+
+  depends_on = [helm_release.ingress-nginx]
+}
+
+###############################################################################
+# Let's Encrypt "suppliers" (staging for testing, prod for the real certificate)
+###############################################################################
+resource "kubectl_manifest" "cluster_issuers" {
+  for_each = { for i, doc in split("---", templatefile("${path.root}/../../k8s/cert-manager/cluster-issuers.yaml", { email = var.letsencrypt_email })) : i => doc if trimspace(doc) != "" }
+
+  yaml_body = each.value
+
+  depends_on = [helm_release.cert_manager]
+}

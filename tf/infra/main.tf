@@ -145,6 +145,8 @@ module "addons" {
   region       = var.region
   vpc_id       = module.vpc.vpc_id
 
+  letsencrypt_email = var.letsencrypt_email
+
   depends_on = [module.eks]
 }
 

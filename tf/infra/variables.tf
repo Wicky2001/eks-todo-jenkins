@@ -20,3 +20,10 @@ variable "cluster_name" {
 variable "project_name" {
   type = string
 }
+
+###############################################################################
+# HTTPS
+###############################################################################
+variable "letsencrypt_email" {
+  type = string
+}
