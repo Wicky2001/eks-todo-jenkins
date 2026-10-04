@@ -25,13 +25,16 @@ pipeline {
         AWS_REGION   = 'us-east-1'
         ECR_REGISTRY = '677501681528.dkr.ecr.us-east-1.amazonaws.com'
 
-        // Two 'Secret text' credentials in Jenkins (keys of the eks-todo-jenkins IAM user).
-        AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
+        // No AWS keys here. Jenkins runs on EC2, and the instance has an IAM role attached.
+        // The AWS CLI finds no keys in the environment, so it asks the EC2 metadata service
+        // (169.254.169.254) and gets temporary keys for that role, renewed automatically.
+
+        // AWS_ACCESS_KEY_ID     = credentials('aws-access-key-id')
+        // AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
 
         // 'Username with password': GitHub username + a Personal Access Token.
         // Used to push the manifest change back to the repo.
-        GITHUB = credentials('github-push')
+        GITHUB = credentials('github-eks-todo-jenkins-PAT')
 
         // Unique per commit, so every deploy is a real change Argo CD can detect.
         IMAGE_TAG = "${GIT_COMMIT}"
@@ -51,6 +54,13 @@ pipeline {
             }
         }
 
+        stage('Debug: Check IAM role') {
+            steps {
+                sh 'aws sts get-caller-identity'
+            }
+        }
+
+
         stage('Login to ECR') {
             when {
                 anyOf {
@@ -60,7 +70,7 @@ pipeline {
                 }
             }
             steps {
-                // The AWS CLI reads AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY from the environment,
+                // The AWS CLI uses the EC2 instance role's temporary keys,
                 // gets a temporary ECR password and pipes it into 'docker login'.
                 sh 'aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"'
             }
