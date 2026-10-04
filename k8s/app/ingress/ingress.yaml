@@ -14,11 +14,11 @@ spec:
   # HTTPS for this name. The certificate will be saved in the Secret "todo-tls".
   tls:
     - hosts:
-        - todo.jawsigt.online
+        - todo.jawsight.online
       secretName: todo-tls
 
   rules:
-    - host: todo.jawsigt.online
+    - host: todo.jawsight.online
       http:
         paths:
           - path: /
