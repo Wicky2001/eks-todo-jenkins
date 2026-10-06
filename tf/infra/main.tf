@@ -178,7 +178,8 @@ module "rds" {
 module "argocd" {
   source = "./modules/argocd"
 
-
+  # The Argo CD Ingress needs ingress-nginx (and its admission webhook) and cert-manager running first.
+  depends_on = [module.addons]
 }
 
 module "monitoring" {

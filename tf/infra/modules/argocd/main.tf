@@ -9,6 +9,15 @@ resource "helm_release" "argocd" {
   create_namespace = true
 }
 
+###############################################################################
+# Argo CD UI over HTTPS at argocd.jawsight.online (ingress-nginx + cert-manager)
+###############################################################################
+resource "kubectl_manifest" "argocd_ingress" {
+  yaml_body = file("${path.root}/../../k8s/argocd/argocd-ingress.yaml")
+
+  depends_on = [helm_release.argocd]
+}
+
 # Patch ArgoCD server service to LoadBalancer
 # resource "terraform_data" "patch_argocd_service" {
 #   provisioner "local-exec" {

@@ -1,0 +1,36 @@
+# Serves the Argo CD UI at https://argocd.jawsight.online through the same NLB and
+# ingress-nginx as the todo app. nginx tells the two apart by hostname.
+#
+#   Browser ══HTTPS (Let's Encrypt)══► nginx ══HTTPS (Argo CD's own certificate)══► argocd-server
+#
+# Needs a Namecheap CNAME "argocd" pointing to the NLB, like "todo".
+# The argocd CLI must use --grpc-web through this Ingress.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  # An Ingress can only send traffic to Services in its own namespace.
+  namespace: argocd
+  annotations:
+    # cert-manager gets a trusted certificate for the host below.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # argocd-server only speaks HTTPS, so nginx encrypts again on the way to it.
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - argocd.jawsight.online
+      # Not "argocd-server-tls": Argo CD reads that name for its own certificate.
+      secretName: argocd-ingress-tls
+  rules:
+    - host: argocd.jawsight.online
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  name: https
