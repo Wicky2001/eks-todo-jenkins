@@ -6,18 +6,18 @@ metadata:
 spec:
   project: eks-todo-project
   sources:
-    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins.git
+    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins-gitops.git
       targetRevision: main
-      path: k8s/app/migration # Path 2
-    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins.git
+      path: migration 
+    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins-gitops.git
       targetRevision: main
-      path: k8s/app/frontend # Path 1
-    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins.git
+      path: frontend
+    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins-gitops.git
       targetRevision: main
-      path: k8s/app/backend
-    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins.git
+      path: backend
+    - repoURL: https://github.com/Wicky2001/eks-todo-jenkins-gitops.git
       targetRevision: main
-      path: k8s/app/ingress
+      path: ingress
   destination:
     server: https://kubernetes.default.svc
     namespace: app

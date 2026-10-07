@@ -138,6 +138,9 @@ pipeline {
                     git fetch origin main
                     git checkout -B main FETCH_HEAD
 
+                    # One commit per service, so it is easy to perform `git revert <commit>`. There for easy to rollback releases.
+                    DEPLOY_DATE="$(date -u '+%Y-%m-%d %H:%M UTC')"
+
                     for svc in $CHANGED_SERVICES; do
                       case "$svc" in
                         backend)   file=k8s/app/backend/deployment.yaml ;;
@@ -147,9 +150,11 @@ pipeline {
                       # Replace the old tag after 'eks-todo-<svc>:' with the new one.
                       sed -i "s|eks-todo-${svc}:[^\\"[:space:]]*|eks-todo-${svc}:${IMAGE_TAG}|" "$file"
                       git add "$file"
-                    done
 
-                    git commit -m "deploy:${CHANGED_SERVICES} -> ${IMAGE_TAG}"
+                      SVC_UPPER="$(echo "$svc" | tr '[:lower:]' '[:upper:]')"
+                      git commit -m "DEPLOY ${SVC_UPPER} | ${DEPLOY_DATE} | eks-todo-${svc}:${IMAGE_TAG}" \
+                                 -m "Built from source commit ${IMAGE_TAG}."
+                    done
 
                     # The helper hands git the token through the environment,
                     # so it never appears in the command line or the remote URL.
