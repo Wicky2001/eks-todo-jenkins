@@ -22,7 +22,7 @@ Where they are defined:
 
 - the NLB settings: [`tf/infra/modules/addons/nginx-ingress-controller-helm-values.yaml`](../tf/infra/modules/addons/nginx-ingress-controller-helm-values.yaml)
 - the Helm installs: [`tf/infra/modules/addons/main.tf`](../tf/infra/modules/addons/main.tf)
-- the routing rules: [`k8s/app/ingress/ingress.yaml`](../k8s/app/ingress/ingress.yaml)
+- the routing rules: [`eks-todo-jenkins-gitops/ingress/ingress.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/ingress/ingress.yaml)
 
 ---
 

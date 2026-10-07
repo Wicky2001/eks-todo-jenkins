@@ -29,7 +29,7 @@ A Namecheap **CNAME** points `todo.jawsight.online` to the NLB. **cert-manager**
 
 ## GitOps with Argo CD
 
-Jenkins pushes images to **ECR** tagged with the commit SHA and commits the new tag to `k8s/app`. **Argo CD** syncs it to the cluster. The database migration Job runs in an earlier **sync wave**, so the backend updates only after the migration finishes.
+Jenkins pushes images to **ECR** tagged with the commit SHA and commits the new tag to the [GitOps repo](https://github.com/Wicky2001/eks-todo-jenkins-gitops).  **Argo CD** syncs it to the cluster. The database migration Job runs in an earlier **sync wave**, so the backend updates only after the migration finishes.
 
 ![Argo CD network view of eks-todo-app](screenshots/argo_cd.jpg)
 

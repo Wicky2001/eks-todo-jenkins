@@ -2,8 +2,9 @@
 //  Jenkinsfile.deploy
 //  1) Build + push only the services whose folder changed, to ECR,
 //     tagged with the full git commit SHA (never 'latest').
-//  2) Write the new tag into the Kubernetes manifests and push
-//     that commit to main. Argo CD sees the change and deploys it.
+//  2) Write the new tag into the Kubernetes manifests in the GitOps repo
+//     (eks-todo-jenkins-gitops) and push it. Argo CD watches that repo
+//     and deploys the change. This repo only holds the source code.
 // ============================================================
 
 pipeline {
@@ -15,8 +16,9 @@ pipeline {
 
     parameters {
         string(
-            name: 'VITE_API_BASE_URL',
+            name: 'VITE_API_URL',
             defaultValue: '',
+            trim: true,
             description: 'Base URL of the backend API, baked into the frontend build'
         )
     }
@@ -33,8 +35,11 @@ pipeline {
         // AWS_SECRET_ACCESS_KEY = credentials('aws-secret-access-key')
 
         // 'Username with password': GitHub username + a Personal Access Token.
-        // Used to push the manifest change back to the repo.
+        // Used to push the manifest change to the GitOps repo.
         GITHUB = credentials('github-eks-todo-jenkins-PAT')
+
+        // The repo Argo CD watches. Only deploy commits go there.
+        GITOPS_REPO = 'https://github.com/Wicky2001/eks-todo-jenkins-gitops.git'
 
         // Unique per commit, so every deploy is a real change Argo CD can detect.
         IMAGE_TAG = "${GIT_COMMIT}"
@@ -100,7 +105,7 @@ pipeline {
                 sh '''
                     docker build \
                       -f frontend/Dockerfile \
-                      --build-arg VITE_API_BASE_URL="$VITE_API_BASE_URL" \
+                      --build-arg VITE_API_URL="$VITE_API_URL" \
                       -t $IMAGE \
                       .
                 '''
@@ -131,35 +136,59 @@ pipeline {
             when { expression { env.CHANGED_SERVICES != null } }
             steps {
                 sh '''
+                    # Fresh copy of the latest GitOps repo, so we never overwrite newer commits.
+                    rm -rf gitops
+                    git clone --depth 1 --branch main "$GITOPS_REPO" gitops
+                    cd gitops
+
                     git config user.name "Jenkins"
                     git config user.email "jenkins@eks-todo.local"
-
-                    # Start from the latest main, so we never overwrite newer commits.
-                    git fetch origin main
-                    git checkout -B main FETCH_HEAD
 
                     # One commit per service, so it is easy to perform `git revert <commit>`. There for easy to rollback releases.
                     DEPLOY_DATE="$(date -u '+%Y-%m-%d %H:%M UTC')"
 
-                    for svc in $CHANGED_SERVICES; do
+                    for svc in $CHANGED_SERVICES
+                     do
                       case "$svc" in
-                        backend)   file=k8s/app/backend/deployment.yaml ;;
-                        frontend)  file=k8s/app/frontend/deployment.yaml ;;
-                        migration) file=k8s/app/migration/migration-job.yaml ;;
+                        backend)   
+                            file=backend/deployment.yaml 
+                            ;;
+                        frontend)  
+                            file=frontend/deployment.yaml 
+                            ;;
+                        migration) 
+                            file=migration/migration-job.yaml 
+                            ;;
                       esac
-                      # Replace the old tag after 'eks-todo-<svc>:' with the new one.
-                      sed -i "s|eks-todo-${svc}:[^\\"[:space:]]*|eks-todo-${svc}:${IMAGE_TAG}|" "$file"
+
+                      # sed -i "s|OLD|NEW" here s means substitution.
+                      # replace the old image tag with new image tag.
+
+                      sed -i "s|eks-todo-${svc}:.*|eks-todo-${svc}:${IMAGE_TAG}|" "$file"
                       git add "$file"
 
+                      # SVC_UPPER="$(echo "$svc" | tr '[:lower:]' '[:upper:]')"
+                      # convert the service name to Uppercase
+
                       SVC_UPPER="$(echo "$svc" | tr '[:lower:]' '[:upper:]')"
-                      git commit -m "DEPLOY ${SVC_UPPER} | ${DEPLOY_DATE} | eks-todo-${svc}:${IMAGE_TAG}" \
+
+                      git commit -m "DEPLOY ${SVC_UPPER}---${DEPLOY_DATE} eks-todo-${svc}:${IMAGE_TAG}" \
                                  -m "Built from source commit ${IMAGE_TAG}."
                     done
 
                     # The helper hands git the token through the environment,
                     # so it never appears in the command line or the remote URL.
-                    git -c credential.helper='!f() { echo username=$GITHUB_USR; echo password=$GITHUB_PSW; }; f' \
-                      push origin main
+                    
+                    CREDENTIAL_HELPER='
+                    f() {
+                        echo username=$GITHUB_USR
+                        echo password=$GITHUB_PSW
+                    }
+                    f
+                    '
+
+                    # Push changes using the credential helper.
+                    git -c credential.helper="$CREDENTIAL_HELPER" push origin main
                 '''
             }
         }

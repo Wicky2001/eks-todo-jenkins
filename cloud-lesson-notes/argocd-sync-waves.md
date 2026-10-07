@@ -96,18 +96,18 @@ A Service never names a Deployment. It only says "send traffic to pods with this
 
 | Wave | File | Why |
 |---|---|---|
-| -2 | [`k8s/app/backend/service-account.yaml`](../k8s/app/backend/service-account.yaml) | the migration Job runs as this ServiceAccount |
-| -2 | [`k8s/app/backend/config-map.yaml`](../k8s/app/backend/config-map.yaml) | the migration Job reads these settings |
-| -1 | [`k8s/app/migration/migration-job.yaml`](../k8s/app/migration/migration-job.yaml) | the migration must finish before the backend updates |
-| 0 | [`k8s/app/backend/deployment.yaml`](../k8s/app/backend/deployment.yaml) | runs after the migration |
-| 0 | [`k8s/app/frontend/deployment.yaml`](../k8s/app/frontend/deployment.yaml) | runs after the migration |
+| -2 | [`eks-todo-jenkins-gitops/backend/service-account.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/backend/service-account.yaml) | the migration Job runs as this ServiceAccount |
+| -2 | [`eks-todo-jenkins-gitops/backend/config-map.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/backend/config-map.yaml) | the migration Job reads these settings |
+| -1 | [`eks-todo-jenkins-gitops/migration/migration-job.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/migration/migration-job.yaml) | the migration must finish before the backend updates |
+| 0 | [`eks-todo-jenkins-gitops/backend/deployment.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/backend/deployment.yaml) | runs after the migration |
+| 0 | [`eks-todo-jenkins-gitops/frontend/deployment.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/frontend/deployment.yaml) | runs after the migration |
 | 0 (no annotation) | Services, Ingress | order does not matter for them |
 
 ## What happens on each kind of deploy
 
 ```
 Backend-only change
-  Jenkins updates only k8s/app/backend/deployment.yaml
+  Jenkins updates only backend/deployment.yaml in the GitOps repo
   Wave -2   unchanged → skip
   Wave -1   Job unchanged and Complete → skip
   Wave  0   backend updated

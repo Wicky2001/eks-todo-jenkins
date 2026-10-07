@@ -137,7 +137,7 @@ docker exec agent1 aws --version
 flowchart LR
     push["Push to main"] --> jenkins["Jenkins<br/>Jenkinsfile.deploy"]
     jenkins -->|"build changed services,<br/>tag = commit SHA"| ecr[("Amazon ECR")]
-    jenkins -->|"commit new image tag<br/>to k8s/app/*.yaml"| repo["GitHub repo (main)"]
+    jenkins -->|"commit new image tag<br/>to the GitOps repo"| repo["GitHub repo (main)"]
     repo -->|"Argo CD sees the change"| argo["Argo CD"]
     argo -->|"deploys"| eks["EKS cluster"]
     ecr -.->|"image pulled"| eks

@@ -246,7 +246,7 @@ The association only stores **names**. It does not create the ServiceAccount, an
 | CoreDNS (`kube-system`, ServiceAccount `coredns`) | No, different ServiceAccount |
 | A pod in `app` using a ServiceAccount with the same name | No, different namespace |
 
-The ServiceAccount itself is created by whoever installs the software: the EBS add-on creates `ebs-csi-controller-sa`, the Helm chart creates `aws-load-balancer-controller-sa`, and we write `backend-sa` ourselves in [`k8s/app/backend/service-account.yaml`](../k8s/app/backend/service-account.yaml).
+The ServiceAccount itself is created by whoever installs the software: the EBS add-on creates `ebs-csi-controller-sa`, the Helm chart creates `aws-load-balancer-controller-sa`, and we write `backend-sa` ourselves in [`backend/service-account.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/backend/service-account.yaml) in the GitOps repo.
 
 ### What EKS puts in the pod (and what it does not)
 

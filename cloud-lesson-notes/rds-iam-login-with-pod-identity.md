@@ -217,7 +217,7 @@ flowchart LR
 | RDS server, security group, subnets | Terraform | [`main.tf`](../tf/infra/modules/rds/main.tf) (`aws_db_instance.this` and friends) |
 | The admin user `dbadmin` and its password | RDS itself (password kept in Secrets Manager) | `manage_master_user_password = true` in [`main.tf`](../tf/infra/modules/rds/main.tf) |
 | The IAM role, its permission and the association | Terraform (the `eks-pod-identity` module) | module `backend_pod_identity` in [`main.tf`](../tf/infra/modules/rds/main.tf) |
-| The ServiceAccount `backend-sa` | Argo CD, from Git | [`k8s/app/backend/service-account.yaml`](../k8s/app/backend/service-account.yaml) |
+| The ServiceAccount `backend-sa` | Argo CD, from Git | [`eks-todo-jenkins-gitops/backend/service-account.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/backend/service-account.yaml) |
 | The connection settings (`backend-db-config` ConfigMap) | Terraform (the database address only exists after RDS is built) | `kubernetes_config_map_v1.backend_db` in [`main.tf`](../tf/infra/modules/rds/main.tf) |
 | **The database user `todo_app_db_user`** | **A script you run once** | [`scripts/init-db-user.sh`](../scripts/init-db-user.sh) |
 
@@ -287,7 +287,7 @@ The same code runs in both. Only the settings differ.
 | `DB_NAME` | `todos` | `todo_app_db` |
 | `DB_USER` | `demo` | `todo_app_db_user` |
 | `DB_PASSWORD` | `demo` | **not set** |
-| `DB_IAM_AUTH` | `false` | `true` ([`k8s/app/backend/config-map.yaml`](../k8s/app/backend/config-map.yaml)) |
+| `DB_IAM_AUTH` | `false` | `true` ([`eks-todo-jenkins-gitops/backend/config-map.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/backend/config-map.yaml)) |
 | `DB_SSL` | `false` | `true` |
 | `DB_SSL_CA_FILE` | not needed | `/app/certs/rds-global-bundle.pem` |
 | `AWS_REGION` | not needed | `us-east-1` (ConfigMap `backend-db-config`) |
@@ -327,7 +327,7 @@ If Argo CD ran the migration job **before** step 4, it failed because `todo_app_
 kubectl delete job migrate-db -n app
 ```
 
-The image tags in `k8s/app/*` point at images that do not exist in the new ECR until Jenkins has built them, so expect `ImagePullBackOff` until step 5 has run.
+The image tags in `eks-todo-jenkins-gitops/*` point at images that do not exist in the new ECR until Jenkins has built them, so expect `ImagePullBackOff` until step 5 has run.
 
 ---
 

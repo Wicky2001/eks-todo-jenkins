@@ -7,7 +7,7 @@ spec:
   description: "Project for the EKS Todo Application"
   
   sourceRepos:
-    - "https://github.com/Wicky2001/eks-todo-jenkins.git"
+    - "https://github.com/Wicky2001/eks-todo-jenkins-gitops.git"
   
   destinations:
     - namespace: "app"
