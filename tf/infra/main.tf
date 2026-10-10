@@ -195,44 +195,4 @@ module "logging" {
 }
 
 
-###############################################################################
-# 1. Create a Security Group specifically for the Backend Pod
-###############################################################################
-# resource "aws_security_group" "backend_pod_sg" {
-#   name        = "${var.cluster_name}-backend-pod-sg"
-#   description = "Security Group assigned directly to backend pods"
-#   vpc_id      = module.vpc.vpc_id
 
-#   egress {
-#     from_port   = 0
-#     to_port     = 0
-#     protocol    = "-1"
-#     cidr_blocks = ["0.0.0.0/0"]
-#   }
-
-#   tags = {
-#     Name = "${var.cluster_name}-backend-pod-sg"
-#   }
-# }
-
-
-
-###############################################################################
-# 3. Tell Kubernetes to dynamically apply this SG whenever our backend spins up
-###############################################################################
-# resource "kubectl_manifest" "backend_network_policy" {
-#   yaml_body = <<-YAML
-#     apiVersion: vpcresources.k8s.aws/v1beta1
-#     kind: SecurityGroupPolicy
-#     metadata:
-#       name: backend-db-access
-#       namespace: default
-#     spec:
-#       podSelector:
-#         matchLabels:
-#           app: backend
-#       securityGroups:
-#         groupIds:
-#           - ${aws_security_group.backend_pod_sg.id}
-#   YAML
-# }
