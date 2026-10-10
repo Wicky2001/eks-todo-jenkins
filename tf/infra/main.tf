@@ -194,5 +194,11 @@ module "logging" {
   depends_on = [module.addons, module.karpenter]
 }
 
+module "tracing" {
+  source = "./modules/tracing"
+
+  # Needs the ECK operator and the elasticsearch-sc storage class from the logging module.
+  depends_on = [module.logging]
+}
 
 

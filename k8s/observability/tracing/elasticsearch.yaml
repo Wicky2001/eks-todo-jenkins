@@ -1,0 +1,45 @@
+# A separate Elasticsearch only for traces, so tracing and logging never share a database.
+# The same ECK operator (installed by the logging module) runs it, and creates in this namespace:
+#   - Service  traces-es-http                 (port 9200, HTTPS)
+#   - Secret   traces-es-elastic-user          (password of the "elastic" user)
+#   - Secret   traces-es-http-certs-public     (the CA that signed its HTTPS certificate)
+# Jaeger runs in the same namespace, so it can read both Secrets directly.
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: traces
+  namespace: tracing
+spec:
+  version: 9.5.0
+  # Extra user besides "elastic": jaeger-user, which may only use jaeger-* indices.
+  # Both Secrets are created by Terraform (tf/infra/modules/tracing/main.tf).
+  auth:
+    roles:
+      - secretName: jaeger-role
+    fileRealm:
+      - secretName: jaeger-user
+  nodeSets:
+    - name: default
+      count: 1
+      config:
+        node.store.allow_mmap: false
+      podTemplate:
+        spec:
+          containers:
+            - name: elasticsearch
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 2Gi
+                limits:
+                  memory: 2Gi
+      volumeClaimTemplates:
+        - metadata:
+            name: elasticsearch-data
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            # The same gp3 disk type as the logs Elasticsearch (created by the logging module).
+            storageClassName: elasticsearch-sc
+            resources:
+              requests:
+                storage: 10Gi

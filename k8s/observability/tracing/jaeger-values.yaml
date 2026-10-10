@@ -1,0 +1,75 @@
+# Jaeger v2 Helm values. Jaeger v2 is built on the OpenTelemetry Collector, so its config
+# below uses the Collector's layout: receivers → processors → exporters, plus extensions.
+#
+#   frontend / backend ──OTLP :4318──► receiver ──► batch ──► Elasticsearch "traces"
+#   Jaeger UI (:16686) ◄── jaeger_query ◄── Elasticsearch "traces"
+
+jaeger:
+  # The password of jaeger-user, from the Secret Terraform creates in this namespace.
+  # The config below reads it as ${env:ES_PASSWORD}, so it is never written in git.
+  extraEnv:
+    - name: ES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: jaeger-user
+          key: password
+  # The CA that signed Elasticsearch's HTTPS certificate, so Jaeger can verify it.
+  extraVolumes:
+    - name: es-ca
+      secret:
+        secretName: traces-es-http-certs-public
+  extraVolumeMounts:
+    - name: es-ca
+      mountPath: /es-ca
+      readOnly: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+userconfig:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+  processors:
+    batch: {}
+
+  exporters:
+    jaeger_storage_exporter:
+      trace_storage: primary_store
+
+  extensions:
+    healthcheckv2:
+      use_v2: true
+      http:
+        endpoint: 0.0.0.0:13133
+    jaeger_query:
+      storage:
+        traces: primary_store
+    jaeger_storage:
+      backends:
+        primary_store:
+          elasticsearch:
+            server_urls: ["https://traces-es-http.tracing.svc:9200"]
+            # Encrypted and verified against ECK's CA.
+            tls:
+              ca_file: /es-ca/ca.crt
+            auth:
+              basic:
+                username: jaeger-user
+                password: ${env:ES_PASSWORD}
+
+  service:
+    extensions: [healthcheckv2, jaeger_query, jaeger_storage]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [jaeger_storage_exporter]
