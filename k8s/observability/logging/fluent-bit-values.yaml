@@ -5,8 +5,8 @@ env:
   - name: ES_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: elasticsearch-es-elastic-user
-        key: elastic
+        name: fluentbit-user
+        key: password
 
 extraVolumes:
   - name: es-ca
@@ -42,7 +42,7 @@ config:
         Match kube.*
         Host elasticsearch-es-http.logging.svc
         Port 9200
-        HTTP_User elastic
+        HTTP_User fluentbit-user
         HTTP_Passwd ${ES_PASSWORD}
         tls On
         tls.verify On

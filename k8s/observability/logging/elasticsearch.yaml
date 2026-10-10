@@ -5,6 +5,13 @@ metadata:
   namespace: logging
 spec:
   version: 9.5.0
+  # Extra user besides "elastic": fluentbit-user, which may only write logs-* indices.
+  # Both Secrets are created by Terraform (tf/infra/modules/logging/main.tf).
+  auth:
+    roles:
+      - secretName: fluentbit-role
+    fileRealm:
+      - secretName: fluentbit-user
   nodeSets:
     - name: default
       count: 1
