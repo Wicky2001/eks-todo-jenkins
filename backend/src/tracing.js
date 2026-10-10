@@ -6,7 +6,7 @@ const {OTLPTraceExporter} = require("@opentelemetry/exporter-trace-otlp-http");
 const { registerInstrumentations } = require("@opentelemetry/instrumentation");
 const { resourceFromAttributes } = require("@opentelemetry/resources");
 const {SemanticResourceAttributes} = require("@opentelemetry/semantic-conventions");
-const { SimpleSpanProcessor } = require("@opentelemetry/sdk-trace-base");
+const { BatchSpanProcessor } = require("@opentelemetry/sdk-trace-base");
 const { HttpInstrumentation } = require("@opentelemetry/instrumentation-http");
 const { PgInstrumentation } = require("@opentelemetry/instrumentation-pg");
 const {ExpressInstrumentation} = require("@opentelemetry/instrumentation-express");
@@ -35,16 +35,23 @@ try {
 
   const exporter = new OTLPTraceExporter(collectorOptions);
 
-  // Add a span processor to the provider
+  // Batch: finished spans wait in a queue and are sent in groups (every 5 s, or 512 at a time),
+  // instead of one network call per span.
   const provider = new NodeTracerProvider({
   resource: resource,
   spanProcessors: [
-    new SimpleSpanProcessor(exporter)
+    new BatchSpanProcessor(exporter)
   ]
 });
 
   // Initialize the provider and instrumentations
   provider.register();
+
+  // When Kubernetes stops the pod it sends SIGTERM. Send the spans still waiting
+  // in the queue before exiting, so the last requests are not lost.
+  process.on("SIGTERM", () => {
+    provider.shutdown().finally(() => process.exit(0));
+  });
 
   // Automatic instrumentation for HTTP, Express, and PostgreSQL
   registerInstrumentations({
