@@ -10,6 +10,7 @@ Notes written while learning how this project works on AWS. Read them in this or
 | 4 | [VPC CNI and pod networking](vpc-cni-pod-networking.md) | The whole path of a request: listeners, target groups, why the NLB skips the Service, NodePort vs IP mode, what a CNI is, and how overlay CNIs like Flannel differ from the VPC CNI. |
 | 5 | [Argo CD sync waves](argocd-sync-waves.md) | How the migration Job runs before the backend, why a sync wave and not a PreSync hook, and why the ServiceAccount and ConfigMap need an earlier wave. |
 | 6 | [Prometheus stack monitoring](prometheus-stack-monitoring.md) | How prom-client, Prometheus, Alertmanager and Grafana fit together, who pulls from whom, and why each one has its own database. |
+| 7 | [Tracing](tracing.md) | Traces and spans, the OpenTelemetry and Jaeger components for the frontend and backend, how to read a trace timeline, and how self time shows what is slow. |
 
 Other how-to notes live next to the code they describe:
 
