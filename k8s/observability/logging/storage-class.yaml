@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: elasticsearch-sc
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+parameters:
+  type: gp3
+  tagSpecification_1: "Name=elasticsearch-logs-ebs"
+  tagSpecification_2: "Project=EKS-Todo"
+  tagSpecification_3: "Component=Logs"

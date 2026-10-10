@@ -187,6 +187,13 @@ module "monitoring" {
 
 }
 
+module "logging" {
+  source = "./modules/logging"
+
+  # Elasticsearch needs the EBS CSI driver for its disk, and Karpenter nodes to run on.
+  depends_on = [module.addons, module.karpenter]
+}
+
 
 ###############################################################################
 # 1. Create a Security Group specifically for the Backend Pod

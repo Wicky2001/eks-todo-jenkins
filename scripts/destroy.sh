@@ -55,6 +55,8 @@ if aws eks describe-cluster --name "$CLUSTER" --region "$REGION" >/dev/null 2>&1
 
   step "Delete the monitoring stack's workloads and disks (PVCs), so the EBS volumes are deleted"
   kubectl delete prometheus,alertmanager --all -n monitoring --ignore-not-found --wait=true || true
+  # ECK deletes the Elasticsearch pod and its disk when the Elasticsearch object is deleted.
+  kubectl delete kibana,elasticsearch --all -A --ignore-not-found --wait=true 2>/dev/null || true
   kubectl delete deployment,statefulset --all -n monitoring --ignore-not-found --wait=true || true
   kubectl delete pvc --all -A --wait=true --timeout=5m || true
   kubectl wait --for=delete pv --all --timeout=5m 2>/dev/null || true
