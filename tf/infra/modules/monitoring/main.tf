@@ -75,3 +75,10 @@ resource "helm_release" "monitoring" {
     kubernetes_secret_v1.grafana_es_credentials,
   ]
 }
+
+# Grafana at https://grafana.jawsight.online (ingress-nginx + cert-manager)
+resource "kubectl_manifest" "grafana_ingress" {
+  yaml_body = file("${path.root}/../../k8s/observability/monitoring/grafana-ingress.yaml")
+
+  depends_on = [helm_release.monitoring]
+}
