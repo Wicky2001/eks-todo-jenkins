@@ -11,7 +11,7 @@ env:
 extraVolumes:
   - name: es-ca
     secret:
-      secretName: elasticsearch-es-http-certs-public
+      secretName: logs-es-http-certs-public
 extraVolumeMounts:
   - name: es-ca
     mountPath: /es-ca
@@ -40,7 +40,7 @@ config:
     [OUTPUT]
         Name es
         Match kube.*
-        Host elasticsearch-es-http.logging.svc
+        Host logs-es-http.logging.svc
         Port 9200
         HTTP_User fluentbit-user
         HTTP_Passwd ${ES_PASSWORD}

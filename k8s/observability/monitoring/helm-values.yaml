@@ -14,8 +14,84 @@
 # ─── GRAFANA CONFIGURATION ──────────────────────────────────────────
 # Configures the global settings for the Grafana visual dashboard portal.
 grafana:
-  # Sets the initial admin dashboard password. (Change this for production!)
-  adminPassword: prom-operator
+  # The admin login comes from the Secret "grafana-admin", which Terraform creates with a
+  # random password (tf/infra/modules/monitoring/main.tf). No password is written in git.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+  # Grafana at https://grafana.jawsight.online, through ingress-nginx, with a Let's Encrypt
+  # certificate from cert-manager (same as the todo app and Argo CD).
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - grafana.jawsight.online
+    path: /
+    tls:
+      - secretName: grafana-ingress-tls
+        hosts:
+          - grafana.jawsight.online
+
+  # Grafana must know its public address to build correct links and login redirects.
+  grafana.ini:
+    server:
+      root_url: https://grafana.jawsight.online
+
+  # One UI for everything: Prometheus (metrics) is built in; the two below add logs and traces.
+
+  # The password of the read-only Elasticsearch user, from the Secret Terraform creates.
+  # The data source below reads it as ${ES_PASSWORD}, so it is never written in git.
+  envValueFrom:
+    ES_PASSWORD:
+      secretKeyRef:
+        name: grafana-es-credentials
+        key: password
+    # The CA of the logs Elasticsearch, copied into this namespace by trust-manager
+    # (k8s/observability/logging/logs-es-ca-bundle.yaml). Used to verify its certificate.
+    ES_CA:
+      configMapKeyRef:
+        name: logs-es-ca
+        key: ca.crt
+
+  additionalDataSources:
+    # Logs: Grafana searches the logs-* indices that Fluent Bit writes.
+    - name: Elasticsearch logs
+      type: elasticsearch
+      uid: elasticsearch-logs
+      access: proxy
+      url: https://logs-es-http.logging.svc:9200
+      basicAuth: true
+      basicAuthUser: grafana-user
+      secureJsonData:
+        basicAuthPassword: ${ES_PASSWORD}
+        tlsCACert: ${ES_CA}
+      jsonData:
+        index: "logs-*"
+        timeField: "@timestamp"
+        logMessageField: log
+        # Encrypted and verified: the certificate must be signed by the CA in ES_CA.
+        tlsAuthWithCACert: true
+
+    # Traces: Grafana asks Jaeger's query API for traces. Jaeger's own UI stays private
+    # (port-forward only), because it has no login.
+    - name: Jaeger
+      type: jaeger
+      uid: jaeger
+      access: proxy
+      url: http://jaeger.tracing.svc.cluster.local:16686
+      jsonData:
+        # "Logs for this span" button: opens the logs from 1 minute before to 1 minute
+        # after the span, in the Elasticsearch logs data source.
+        tracesToLogsV2:
+          datasourceUid: elasticsearch-logs
+          spanStartTimeShift: "-1m"
+          spanEndTimeShift: "1m"
+          filterByTraceID: false
+          filterBySpanID: false
 
   # Requests a dedicated, permanent AWS EBS disk for Grafana's /var/lib/grafana
   # directory (its SQLite DB: custom dashboards, users, API keys, preferences).

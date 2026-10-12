@@ -1,17 +1,21 @@
 apiVersion: elasticsearch.k8s.elastic.co/v1
 kind: Elasticsearch
 metadata:
-  name: elasticsearch
+  name: logs
   namespace: logging
 spec:
   version: 9.5.0
-  # Extra user besides "elastic": fluentbit-user, which may only write logs-* indices.
-  # Both Secrets are created by Terraform (tf/infra/modules/logging/main.tf).
+  # Extra users besides "elastic":
+  #   fluentbit-user  may only write logs-* indices  (Fluent Bit sends logs)
+  #   grafana-user    may only read  logs-* indices  (Grafana shows logs)
+  # The Secrets are created by Terraform (tf/infra/modules/logging/main.tf).
   auth:
     roles:
       - secretName: fluentbit-role
+      - secretName: grafana-role
     fileRealm:
       - secretName: fluentbit-user
+      - secretName: grafana-user
   nodeSets:
     - name: default
       count: 1

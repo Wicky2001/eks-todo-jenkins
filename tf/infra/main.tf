@@ -185,6 +185,12 @@ module "argocd" {
 module "monitoring" {
   source = "./modules/monitoring"
 
+  # Grafana reads logs from Elasticsearch as the read-only user the logging module creates.
+  grafana_es_password = module.logging.grafana_es_password
+
+  # Grafana's Ingress needs ingress-nginx (and its admission webhook) and cert-manager first,
+  # and Grafana reads the logs Elasticsearch CA that the logging module shares (trust-manager).
+  depends_on = [module.addons, module.logging]
 }
 
 module "logging" {
