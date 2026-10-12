@@ -11,6 +11,7 @@ Notes written while learning how this project works on AWS. Read them in this or
 | 5 | [Argo CD sync waves](argocd-sync-waves.md) | How the migration Job runs before the backend, why a sync wave and not a PreSync hook, and why the ServiceAccount and ConfigMap need an earlier wave. |
 | 6 | [Prometheus stack monitoring](prometheus-stack-monitoring.md) | How prom-client, Prometheus, Alertmanager and Grafana fit together, who pulls from whom, and why each one has its own database. |
 | 7 | [Tracing](tracing.md) | Traces and spans, the OpenTelemetry and Jaeger components for the frontend and backend, how to read a trace timeline, and how self time shows what is slow. |
+| 8 | [Grafana for metrics, logs and traces](grafana-metrics-logs-traces.md) | Grafana as the one UI: which backend each signal comes from, why traces go through Jaeger, the two Elasticsearch databases, users, and sharing the CA with trust-manager. |
 
 Other how-to notes live next to the code they describe:
 

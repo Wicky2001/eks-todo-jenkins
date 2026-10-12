@@ -20,7 +20,7 @@ Names, ports and IP addresses are the real ones from our cluster, so you can com
 
 Where they are defined:
 
-- the NLB settings: [`tf/infra/modules/addons/nginx-ingress-controller-helm-values.yaml`](../tf/infra/modules/addons/nginx-ingress-controller-helm-values.yaml)
+- the NLB settings: [`k8s/ingress-nginx/helm-values.yaml`](../k8s/ingress-nginx/helm-values.yaml)
 - the Helm installs: [`tf/infra/modules/addons/main.tf`](../tf/infra/modules/addons/main.tf)
 - the routing rules: [`eks-todo-jenkins-gitops/ingress/ingress.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/ingress/ingress.yaml)
 

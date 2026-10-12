@@ -6,6 +6,7 @@
 - **OpenTelemetry** runs inside the frontend and the backend. It creates the spans and sends them out.
 - **Jaeger** receives the spans, stores them in **Elasticsearch**, and shows each request as a timeline.
 - To find what is slow, look at **self time**: the time a step spent on its own work, not waiting for its children.
+- In this project you open traces **in Grafana** (Explore → data source **Jaeger**), next to metrics and logs. Jaeger's own UI stays private (port-forward only), because it has no login.
 
 ---
 

@@ -7,6 +7,7 @@
 - **Grafana asks** Prometheus for numbers every time a dashboard opens. It never stores metrics itself.
 - **Alertmanager** gets alerts from Prometheus and sends emails.
 - Each tool has **its own disk**, because each one stores a different kind of data.
+- Grafana is the **one UI** for everything: metrics (Prometheus), logs (Elasticsearch, read-only user `grafana-user`) and traces (Jaeger). It is served at `https://grafana.jawsight.online`.
 
 ## The diagram
 
