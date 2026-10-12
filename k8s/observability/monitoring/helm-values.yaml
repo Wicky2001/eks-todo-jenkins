@@ -1,50 +1,36 @@
-# ==============================================================================
-# 🔥 IMPORTANT PRE-REQUISITE STEP 🔥
-# Before deploying or upgrading this Prometheus Stack using Helm, you MUST 
-# create the required StorageClasses inside your Kubernetes cluster.
-#
-# Run this command first:
-#   kubectl apply -f storage-classes.yaml
-#
-# Why? If you apply this Helm chart before creating those StorageClasses, 
-# your PersistentVolumeClaims (PVCs) will fail to discover the storage backend 
-# and will remain stuck in a 'Pending' state indefinitely.
-# ==============================================================================
+# Values for the kube-prometheus-stack chart (Prometheus, Alertmanager, Grafana).
+# The storage classes used below come from storage-classes.yaml. Terraform applies
+# them before this chart, otherwise the disks would stay Pending.
 
-# ─── GRAFANA CONFIGURATION ──────────────────────────────────────────
-# Configures the global settings for the Grafana visual dashboard portal.
 grafana:
-  # The admin login comes from the Secret "grafana-admin", which Terraform creates with a
-  # random password (tf/infra/modules/monitoring/main.tf). No password is written in git.
+  # Admin login from the grafana-admin Secret (Terraform generates the password).
   admin:
     existingSecret: grafana-admin
     userKey: admin-user
     passwordKey: admin-password
 
-  # Grafana's Ingress is its own file: k8s/observability/monitoring/grafana-ingress.yaml.
-  # Grafana must know that public address to build correct links and login redirects.
+  # Public address, needed for links and login redirects.
+  # The Ingress itself is in grafana-ingress.yaml.
   grafana.ini:
     server:
       root_url: https://grafana.jawsight.online
 
-  # One UI for everything: Prometheus (metrics) is built in; the two below add logs and traces.
-
-  # The password of the read-only Elasticsearch user, from the Secret Terraform creates.
-  # The data source below reads it as ${ES_PASSWORD}, so it is never written in git.
+  # Grafana shows metrics, logs and traces. Prometheus is added by the chart,
+  # logs and traces are added below.
   envValueFrom:
+    # password of grafana-user (read-only user in the logs Elasticsearch)
     ES_PASSWORD:
       secretKeyRef:
         name: grafana-es-credentials
         key: password
-    # The CA of the logs Elasticsearch, copied into this namespace by trust-manager
-    # (k8s/observability/logging/logs-es-ca-bundle.yaml). Used to verify its certificate.
+    # CA of the logs Elasticsearch, copied here by trust-manager (logs-es-ca-bundle.yaml)
     ES_CA:
       configMapKeyRef:
         name: logs-es-ca
         key: ca.crt
 
   additionalDataSources:
-    # Logs: Grafana searches the logs-* indices that Fluent Bit writes.
+    # Logs written by Fluent Bit
     - name: Elasticsearch logs
       type: elasticsearch
       uid: elasticsearch-logs
@@ -59,19 +45,16 @@ grafana:
         index: "logs-*"
         timeField: "@timestamp"
         logMessageField: log
-        # Encrypted and verified: the certificate must be signed by the CA in ES_CA.
         tlsAuthWithCACert: true
 
-    # Traces: Grafana asks Jaeger's query API for traces. Jaeger's own UI stays private
-    # (port-forward only), because it has no login.
+    # Traces. Grafana goes through Jaeger's API; the Jaeger UI itself stays private.
     - name: Jaeger
       type: jaeger
       uid: jaeger
       access: proxy
       url: http://jaeger.tracing.svc.cluster.local:16686
       jsonData:
-        # "Logs for this span" button: opens the logs from 1 minute before to 1 minute
-        # after the span, in the Elasticsearch logs data source.
+        # "Logs for this span" opens the logs from 1 minute before to 1 minute after the span.
         tracesToLogsV2:
           datasourceUid: elasticsearch-logs
           spanStartTimeShift: "-1m"
@@ -79,79 +62,56 @@ grafana:
           filterByTraceID: false
           filterBySpanID: false
 
-  # Requests a dedicated, permanent AWS EBS disk for Grafana's /var/lib/grafana
-  # directory (its SQLite DB: custom dashboards, users, API keys, preferences).
-  # Without this, Grafana uses an emptyDir and loses all of that on every pod restart.
+  # Keep dashboards and users on an EBS disk, otherwise they are lost on every restart.
   persistence:
     enabled: true
     type: pvc
-    # Binds this request to the custom gp3 storage class for Grafana.
     storageClassName: grafana-sc
-    # Restricts the AWS EBS disk to be mounted and read/written by only 1 node at a time.
     accessModes: ["ReadWriteOnce"]
-    # Allocates a physical 10 Gigabyte AWS EBS disk for Grafana's state.
     size: 10Gi
 
-  # A ReadWriteOnce EBS volume can only attach to one node at a time. The default
-  # RollingUpdate strategy starts the new pod before the old one releases the disk,
-  # causing a Multi-Attach error. 'Recreate' tears down the old pod first.
+  # The disk can only attach to one pod at a time, so stop the old pod before
+  # starting the new one (RollingUpdate would fail with a Multi-Attach error).
   deploymentStrategy:
     type: Recreate
 
-# ─── ALERTMANAGER CONFIGURATION ──────────────────────────────────────
-# Configures the notification routing engine, which processes alerts sent by Prometheus.
 alertmanager:
   alertmanagerSpec:
-    # Tells Alertmanager to scan the cluster and dynamically discover alert configurations 
-    # (kind: AlertmanagerConfig) that contain the matching label 'release: monitoring'.
+    # Load AlertmanagerConfig objects with this label, from any namespace.
     alertmanagerConfigSelector:
       matchLabels:
         release: monitoring
-
-    # Spins up 2 separate Alertmanager pods. This provides high-availability (HA) redundancy;
-    # if one pod crashes or restarts, your alert notification routes won't drop dead.
-    replicas: 1
-
-    # Disables restrictive namespace matching. Setting this to 'None' allows Alertmanager 
-    # to receive and process alerting definitions globally from any namespace in the cluster.
     alertmanagerConfigMatcherStrategy:
       type: None
 
-    # Dynamically requests dedicated, independent persistent storage for the Alertmanager mesh 
-    # to prevent losing data like active alerts, silences, or configurations during a pod crash.
+    replicas: 1
+
+    # Disk for silences and notification history.
     storage:
       volumeClaimTemplate:
         spec:
-          # Binds this request to your custom, beautifully-tagged alert storage layout.
           storageClassName: alertmanager-alerts-sc
-          # Restricts the AWS EBS disk to be mounted and read/written by only 1 node at a time.
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              # Allocates a physical 10 Gigabyte AWS EBS disk per Alertmanager instance.
               storage: 10Gi
 
-# ─── PROMETHEUS CONFIGURATION ────────────────────────────────────────
-# Configures the core Prometheus engine, containing the core Time Series Database (TSDB).
 prometheus:
   prometheusSpec:
+    # Only pick up ServiceMonitors and rules with this label.
     serviceMonitorSelector:
       matchLabels:
-        release: monitoring    
+        release: monitoring
     ruleSelector:
       matchLabels:
         release: monitoring
-    # Instructs the Prometheus Operator to provision dedicated, permanent AWS storage 
-    # for the TSDB data directory, ensuring your historical metrics survive pod lifecycle restarts.
-    storageSpec: 
+
+    # Disk for the metrics (TSDB), so history survives restarts.
+    storageSpec:
       volumeClaimTemplate:
         spec:
-          # Binds this request to your custom, high-performance gp3 metrics storage class.
           storageClassName: prometheus-metrics-sc
-          # Restricts the AWS EBS disk to be mounted and read/written by only 1 node at a time.
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              # Allocates a physical 20 Gigabyte AWS EBS disk to hold your application metrics.
               storage: 20Gi
-

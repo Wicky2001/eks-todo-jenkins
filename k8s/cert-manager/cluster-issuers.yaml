@@ -1,5 +1,5 @@
-# Let's Encrypt TEST server: certificates are NOT trusted by browsers,
-# but the limits are very high. Use this first to check everything works.
+# Let's Encrypt staging: browsers don't trust these certificates, but the rate limits
+# are high. Use it to test first.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -15,8 +15,7 @@ spec:
           ingress:
             ingressClassName: nginx
 ---
-# Let's Encrypt REAL server: trusted certificates (the padlock),
-# but only 5 certificates per week for the same name.
+# Let's Encrypt production: real, trusted certificates. Limit: 5 per week for the same name.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:

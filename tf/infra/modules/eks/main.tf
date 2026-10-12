@@ -1,7 +1,4 @@
-###############################################################################
-# Pod Identity for AWS EBS CSI Driver
-###############################################################################
-
+# IAM role for the EBS CSI driver (Pod Identity), used by the aws-ebs-csi-driver add-on below
 module "aws_ebs_csi_pod_identity" {
   source = "terraform-aws-modules/eks-pod-identity/aws"
 
@@ -14,14 +11,7 @@ module "aws_ebs_csi_pod_identity" {
   }
 }
 
-
-
-
-
-
-###############################################################################
-# EKS
-###############################################################################
+# EKS cluster
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "21.23.0"
@@ -30,19 +20,14 @@ module "eks" {
   kubernetes_version = "1.33"
 
   endpoint_public_access = true
-  # Cluster access entry
-  # To add the current caller identity as an administrator
+  # make whoever runs terraform a cluster admin
   enable_cluster_creator_admin_permissions = true
 
   enable_irsa = false
 
-
-
-
   compute_config = {
     enabled = false
   }
-
 
   addons = {
     coredns = {
@@ -60,7 +45,7 @@ module "eks" {
       before_compute = true
       configuration_values = jsonencode({
         env = {
-          # This enables the trick to allow more pods on tiny free-tier servers
+          # hand out pod IPs in blocks of 16, so small nodes can run more pods
           ENABLE_PREFIX_DELEGATION = "true"
           WARM_PREFIX_TARGET       = "1"
         }
@@ -85,7 +70,6 @@ module "eks" {
   eks_managed_node_groups = {
     karpenter = {
 
-      # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
       ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = ["c7i-flex.large"]
 
@@ -94,8 +78,8 @@ module "eks" {
       desired_size = 2
 
       taints = {
-        # This Taint aims to keep just EKS Addons and Karpenter running on this MNG
-        # The pods that do not tolerate this taint should run on nodes created by Karpenter
+        # only add-ons and Karpenter run on this node group; everything else
+        # goes to nodes that Karpenter starts
         addons = {
           key    = "CriticalAddonsOnly"
           value  = "true"
@@ -104,7 +88,6 @@ module "eks" {
       }
     }
   }
-
 
   node_security_group_tags = {
     "karpenter.sh/discovery" = var.cluster_name

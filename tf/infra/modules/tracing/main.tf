@@ -1,25 +1,18 @@
-###############################################################################
-# Tracing: frontend and backend (OpenTelemetry) → Jaeger → its own Elasticsearch
-###############################################################################
+# Traces: frontend and backend (OpenTelemetry) -> Jaeger -> Elasticsearch "traces"
 
-# The backend sends spans to jaeger.tracing.svc.cluster.local:4318, so the namespace is "tracing".
+# The backend sends spans to jaeger.tracing.svc.cluster.local:4318.
 resource "kubernetes_namespace_v1" "tracing" {
   metadata {
     name = "tracing"
   }
 }
 
-###############################################################################
-# Elasticsearch user for Jaeger (instead of the "elastic" superuser)
-###############################################################################
+# jaeger-user: can only use the jaeger-* indices (and create their index templates)
 resource "random_password" "jaeger_user" {
   length  = 32
   special = false
 }
 
-
-
-# The role: may only use the jaeger-* indices, and create the index templates for them.
 resource "kubernetes_secret_v1" "jaeger_role" {
   metadata {
     name      = "jaeger-role"
@@ -38,10 +31,9 @@ resource "kubernetes_secret_v1" "jaeger_role" {
       }
     })
   }
-
 }
 
-# ECK reads this as a user: name, password and role. Jaeger reads the password from it too.
+# ECK creates the user from this Secret; Jaeger reads its password from the same Secret.
 resource "kubernetes_secret_v1" "jaeger_user" {
   metadata {
     name      = "jaeger-user"
@@ -57,11 +49,11 @@ resource "kubernetes_secret_v1" "jaeger_user" {
   depends_on = [kubernetes_secret_v1.jaeger_role]
 }
 
-# A separate Elasticsearch for traces, run by the ECK operator from the logging module.
+# Separate Elasticsearch for traces (run by the ECK operator from the logging module)
 resource "kubectl_manifest" "traces_elasticsearch" {
   yaml_body = file("${path.root}/../../k8s/observability/tracing/elasticsearch.yaml")
 
-  # On destroy, wait until ECK has removed the pod and its disk.
+  # on destroy, wait until ECK has deleted the pod and its disk
   wait = true
 
   depends_on = [
@@ -80,6 +72,6 @@ resource "helm_release" "jaeger" {
 
   values = [file("${path.root}/../../k8s/observability/tracing/jaeger-values.yaml")]
 
-  # Jaeger reads the password and CA Secrets that ECK creates for this Elasticsearch.
+  # Jaeger needs the CA Secret that ECK creates for this Elasticsearch
   depends_on = [kubectl_manifest.traces_elasticsearch]
 }

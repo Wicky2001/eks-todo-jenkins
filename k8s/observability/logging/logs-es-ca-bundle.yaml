@@ -1,7 +1,5 @@
-# trust-manager Bundle: copies the logs Elasticsearch's CA certificate (public, harmless)
-# from the Secret ECK keeps in "logging" into a ConfigMap "logs-es-ca" in "monitoring",
-# so Grafana can verify the HTTPS certificate of https://logs-es-http.logging.svc:9200.
-# Only the public CA is copied, never a password.
+# trust-manager copies the public CA of the logs Elasticsearch into a ConfigMap
+# "logs-es-ca" in the monitoring namespace, so Grafana can verify the certificate.
 apiVersion: trust.cert-manager.io/v1alpha1
 kind: Bundle
 metadata:

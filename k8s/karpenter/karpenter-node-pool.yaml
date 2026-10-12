@@ -10,56 +10,19 @@ spec:
         kind: EC2NodeClass
         name: default
 
+      # Which EC2 types Karpenter may start.
       requirements:
-        # ------------------------------------------------------------------
-        # INSTANCE CATEGORY FILTER
-        # ------------------------------------------------------------------
-        # This selects the "family" of EC2 instances.
-        # Example families: t (burstable), c (compute), r (memory)
-        #
-        # We use "t" because:
-        # - It is burstable (cheap)
-        # - Good for dev / low-cost workloads
-        # - Often eligible for Free Tier
-        #
-        # IMPORTANT: This does NOT mean "only t2 or t3"
-        # It means ANY instance family starting with "t"
-        # ------------------------------------------------------------------
+        # c = compute-optimised family (c5, c6i, c7i, ...)
         - key: "karpenter.k8s.aws/instance-category"
           operator: In
           values: ["c"]
 
-        # ------------------------------------------------------------------
-        # INSTANCE CPU FILTER
-        # ------------------------------------------------------------------
-        # Controls how many vCPUs the instance can have
-        #
-        # We restrict it to small sizes:
-        # - 1 vCPU (very small)
-        # - 2 vCPU (micro / small instances)
-        #
-        # Why:
-        # Prevent Karpenter from choosing large expensive instances
-        # like t3.large, t3.xlarge, etc.
-        # ------------------------------------------------------------------
+        # small sizes only, so it never picks an expensive large instance
         - key: "karpenter.k8s.aws/instance-cpu"
           operator: In
           values: ["1", "2"]
 
-        # ------------------------------------------------------------------
-        # INSTANCE GENERATION FILTER
-        # ------------------------------------------------------------------
-        # Controls how new the hardware generation must be
-        #
-        # Gte "2" means:
-        # - Allow generation 2 and above
-        # - Reject very old instance families (gen 1)
-        #
-        # Why:
-        # - Better performance
-        # - Better efficiency
-        # - Avoid outdated hardware
-        # ------------------------------------------------------------------
+        # skip the oldest (generation 1) hardware
         - key: "karpenter.k8s.aws/instance-generation"
           operator: Gte
           values: ["2"]
@@ -68,24 +31,11 @@ spec:
           operator: In
           values: ["amd64"]
 
-  # ----------------------------------------------------------------------
-  # NODE CAPACITY LIMIT
-  # ----------------------------------------------------------------------
-  # Maximum CPU Karpenter is allowed to provision in total
-  # (cluster-wide for this NodePool)
-  # ----------------------------------------------------------------------
+  # Upper limit of CPUs across all nodes of this pool.
   limits:
     cpu: 1000
 
-  # ----------------------------------------------------------------------
-  # DISRUPTION SETTINGS (NODE CONSOLIDATION)
-  # ----------------------------------------------------------------------
-  # WhenEmpty:
-  # - Removes nodes only when they have no pods
-  #
-  # consolidateAfter: 30s
-  # - Waits 30 seconds before consolidating nodes
-  # ----------------------------------------------------------------------
+  # Remove a node 30 seconds after its last pod leaves.
   disruption:
     consolidationPolicy: WhenEmpty
     consolidateAfter: 30s

@@ -5,10 +5,8 @@ metadata:
   namespace: logging
 spec:
   version: 9.5.0
-  # Extra users besides "elastic":
-  #   fluentbit-user  may only write logs-* indices  (Fluent Bit sends logs)
-  #   grafana-user    may only read  logs-* indices  (Grafana shows logs)
-  # The Secrets are created by Terraform (tf/infra/modules/logging/main.tf).
+  # fluentbit-user writes logs-*, grafana-user reads logs-*.
+  # Secrets come from tf/infra/modules/logging.
   auth:
     roles:
       - secretName: fluentbit-role

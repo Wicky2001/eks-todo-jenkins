@@ -1,6 +1,4 @@
-###############################################################################
-# ecr repository for custom app images
-###############################################################################
+# ECR repositories for the app images
 
 resource "aws_ecr_repository" "frontend" {
   name         = "${var.project_name}-frontend"
@@ -42,17 +40,9 @@ resource "aws_ecr_lifecycle_policy" "keep_last_10" {
   })
 }
 
-
-###############################################################################
-# IAM user for Jenkins to push images to ECR
-###############################################################################
-
-/*
-  Jenkins runs outside AWS, so it needs access keys.
-  The access key itself is NOT created here (it would end up in the
-  Terraform state in plain text). Create it in the console instead:
-  IAM -> Users -> <this user> -> Security credentials -> Create access key
-*/
+# IAM user with ECR push rights. Not used any more: Jenkins runs on EC2 and uses its
+# instance role. If you ever need access keys for it, create them in the console,
+# not here, so they don't end up in the Terraform state.
 resource "aws_iam_user" "jenkins" {
   name = "${var.project_name}-jenkins"
 }
@@ -65,13 +55,13 @@ resource "aws_iam_user_policy" "jenkins_ecr_push" {
     Version = "2012-10-17"
     Statement = [
       {
-        # Needed for 'docker login'. This action can't be scoped to a repo.
+        # needed for docker login; this one can't be limited to a repository
         Effect   = "Allow"
         Action   = "ecr:GetAuthorizationToken"
         Resource = "*"
       },
       {
-        # Push only to this project's 3 repositories.
+        # push only to the three app repositories
         Effect = "Allow"
         Action = [
           "ecr:BatchCheckLayerAvailability",

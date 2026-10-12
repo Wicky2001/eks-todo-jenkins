@@ -1,24 +1,19 @@
-###############################################################################
-# Install prometheus stack via helm
-###############################################################################
+# Metrics: Prometheus, Alertmanager and Grafana (kube-prometheus-stack)
 
-
-# 1. Read the multi-document YAML file and split it into individual manifests
+# storage classes for the Prometheus, Alertmanager and Grafana disks (one per --- document)
 resource "kubectl_manifest" "prometheus_storage_classes" {
   for_each  = { for i, doc in split("---", file("${path.root}/../../k8s/observability/monitoring/storage-classes.yaml")) : i => doc if trimspace(doc) != "" }
   yaml_body = each.value
 }
 
-# Created here (not by Helm), so the Grafana admin Secret can exist before Grafana starts.
+# created here instead of by Helm, so the Secrets below exist before Grafana starts
 resource "kubernetes_namespace_v1" "monitoring" {
   metadata {
     name = "monitoring"
   }
 }
 
-###############################################################################
-# Grafana admin login (instead of the chart's well-known default password)
-###############################################################################
+# Grafana admin password (instead of the chart's default, which everyone knows)
 resource "random_password" "grafana_admin" {
   length  = 32
   special = false
@@ -35,8 +30,8 @@ resource "kubernetes_secret_v1" "grafana_admin" {
   }
 }
 
-# Grafana's password for Elasticsearch (logs). A pod can only read Secrets in its own
-# namespace, so the password made by the logging module is copied here.
+# grafana-user's password, copied from the logging module (pods can only read
+# Secrets in their own namespace)
 resource "kubernetes_secret_v1" "grafana_es_credentials" {
   metadata {
     name      = "grafana-es-credentials"
@@ -76,7 +71,7 @@ resource "helm_release" "monitoring" {
   ]
 }
 
-# Grafana at https://grafana.jawsight.online (ingress-nginx + cert-manager)
+# https://grafana.jawsight.online
 resource "kubectl_manifest" "grafana_ingress" {
   yaml_body = file("${path.root}/../../k8s/observability/monitoring/grafana-ingress.yaml")
 

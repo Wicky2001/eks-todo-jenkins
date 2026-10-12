@@ -1,7 +1,6 @@
-###############################################################################
-# Provider
-###############################################################################
 terraform {
+  # State is kept in S3 (bucket created by tf/statebucket). use_lockfile stops two
+  # applies from running at the same time.
   backend "s3" {
     bucket  = "todo-cluster-terraform-state-677501681528"
     region  = "us-east-1"
@@ -11,11 +10,6 @@ terraform {
     use_lockfile = true
   }
 
-
-  /*
-  This block download the providers codes
-  Later using the provider block we configure them.
-  */
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -41,19 +35,16 @@ terraform {
   }
 }
 
-
 provider "aws" {
   region  = var.region
   profile = var.aws_profile
 }
 
-###############################################################################
-# Data Sources
-###############################################################################
 data "aws_caller_identity" "current" {}
 
-
-
+# The kubernetes, helm and kubectl providers log in to the cluster with a short-lived
+# token from `aws eks get-token` (needs the AWS CLI on this machine). The CA certificate
+# makes sure we are talking to our own cluster.
 provider "kubernetes" {
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
@@ -65,41 +56,20 @@ provider "kubernetes" {
   }
 }
 
-/*
-Teach helm how to log in to the EKS cluster
-*/
 provider "helm" {
   kubernetes = {
-    host = module.eks.cluster_endpoint
-    #This is the digital ID card of your cluster. It ensures Terraform is talking to your real cluster and not an imposter.
+    host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
 
     exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      # This requires the awscli to be installed locally where Terraform is executed
-      /*
-      exec block: Instead of using a static, permanent password (which is a bad security practice),
-       this block tells Terraform to execute a command on your local machine (aws eks get-token).
-       This generates a temporary, highly secure login token that lasts for only 15 minutes,
-       allowing Terraform to safely authenticate and install Helm charts.
-
-      */
-      args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
     }
   }
 }
 
-
-
-/*
-While the helm provider installs packaged software, standard Terraform
-does not have a native way to apply raw Kubernetes YAML files
-(like your NodePool, EC2NodeClass, and your inflate deployment).
-The gavinbunney/kubectl provider acts as a bridge to let you write raw YAML directly
-inside Terraform.
-
-*/
+# kubectl provider: applies plain YAML files (NodePool, Ingresses, ...)
 provider "kubectl" {
   apply_retry_count      = 5
   host                   = module.eks.cluster_endpoint
@@ -109,11 +79,9 @@ provider "kubectl" {
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    # This requires the awscli to be installed locally where Terraform is executed
-    args = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
   }
 }
-
 
 module "vpc" {
   source = "./modules/vpc"
@@ -175,36 +143,34 @@ module "rds" {
   app_namespace          = kubernetes_namespace_v1.app.metadata[0].name
 }
 
+# Modules with an Ingress wait for addons: the ingress-nginx webhook and cert-manager
+# have to be running before an Ingress can be created.
 module "argocd" {
   source = "./modules/argocd"
 
-  # The Argo CD Ingress needs ingress-nginx (and its admission webhook) and cert-manager running first.
   depends_on = [module.addons]
 }
 
 module "monitoring" {
   source = "./modules/monitoring"
 
-  # Grafana reads logs from Elasticsearch as the read-only user the logging module creates.
+  # Grafana reads logs as grafana-user, created in the logging module
   grafana_es_password = module.logging.grafana_es_password
 
-  # Grafana's Ingress needs ingress-nginx (and its admission webhook) and cert-manager first,
-  # and Grafana reads the logs Elasticsearch CA that the logging module shares (trust-manager).
+  # also waits for logging, so the Elasticsearch CA copy exists before Grafana starts
   depends_on = [module.addons, module.logging]
 }
 
 module "logging" {
   source = "./modules/logging"
 
-  # Elasticsearch needs the EBS CSI driver for its disk, and Karpenter nodes to run on.
+  # Elasticsearch needs the EBS CSI driver (eks addons) and Karpenter nodes to run on
   depends_on = [module.addons, module.karpenter]
 }
 
 module "tracing" {
   source = "./modules/tracing"
 
-  # Needs the ECK operator and the elasticsearch-sc storage class from the logging module.
+  # uses the ECK operator and the elasticsearch-sc storage class from logging
   depends_on = [module.logging]
 }
-
-

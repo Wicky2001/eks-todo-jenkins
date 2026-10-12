@@ -1,6 +1,3 @@
-###############################################################################
-# Provider
-###############################################################################
 provider "aws" {
   region  = var.region
   profile = var.aws_profile
@@ -17,9 +14,7 @@ terraform {
 
 data "aws_caller_identity" "current" {}
 
-###############################################################################
-# S3 Bucket
-###############################################################################
+# Holds the Terraform state of tf/infra. Versioning keeps old copies of the state.
 resource "aws_s3_bucket" "state" {
   bucket        = "todo-cluster-terraform-state-677501681528"
   force_destroy = true

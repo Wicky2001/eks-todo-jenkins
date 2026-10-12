@@ -1,6 +1,4 @@
-###############################################################################
-# Install Metrics Server Addon via helm
-###############################################################################
+# metrics-server: CPU and memory numbers for kubectl top and autoscaling
 resource "helm_release" "metrics_server" {
   name       = "metrics-server"
   namespace  = "kube-system"
@@ -8,32 +6,25 @@ resource "helm_release" "metrics_server" {
   chart      = "metrics-server"
   version    = "3.12.1"
 
-  # wait = false stops Terraform from freezing if the cluster is busy
+  # don't block terraform apply while the pod starts
   wait = false
 
-  # We pass the custom settings directly to the app here
   values = [
     <<-EOT
-    # 1. The VIP Key to let it sit on your reserved t3.small nodes
+    # allow it on the add-on node group (it has the CriticalAddonsOnly taint)
     tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
         effect: "NoSchedule"
 
-    # 2. Stops it from crashing due to AWS self-signed security certificates
+    # the kubelets use self-signed certificates on EKS
     args:
       - --kubelet-insecure-tls
     EOT
   ]
 }
 
-
-
-
-###############################################################################
-# Pod Identity for AWS Load Balancer Controller
-###############################################################################
-
+# IAM role for the AWS Load Balancer Controller (Pod Identity)
 module "aws_lb_controller_pod_identity" {
   source = "terraform-aws-modules/eks-pod-identity/aws"
 
@@ -54,15 +45,13 @@ module "aws_lb_controller_pod_identity" {
   }
 }
 
-
-
+# Creates the NLB for Services of type LoadBalancer (the ingress-nginx Service)
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
   version    = "1.7.2"
-
 
   values = [
     yamlencode({
@@ -99,13 +88,9 @@ resource "helm_release" "aws_load_balancer_controller" {
   ]
 
   depends_on = [module.aws_lb_controller_pod_identity]
-
 }
 
-###############################################################################
-# Install nginx ingress controller via helm, using a custom values.yaml file for configuration
-###############################################################################
-
+# ingress-nginx: routes requests from the NLB to the apps (values in k8s/ingress-nginx)
 resource "helm_release" "ingress-nginx" {
   name             = "ingress-nginx"
   repository       = "https://kubernetes.github.io/ingress-nginx"
@@ -116,12 +101,7 @@ resource "helm_release" "ingress-nginx" {
   values           = [file("${path.root}/../../k8s/ingress-nginx/helm-values.yaml")]
 
   depends_on = [helm_release.aws_load_balancer_controller]
-
 }
-
-###############################################################################
-# Install Sealed Secrets Controller via helm
-###############################################################################
 
 resource "helm_release" "sealed_secrets" {
   name             = "sealed-secrets"
@@ -142,13 +122,9 @@ resource "helm_release" "sealed_secrets" {
       ]
     })
   ]
-
 }
 
-
-###############################################################################
-# cert-manager: gets HTTPS certificates from Let's Encrypt and renews them
-###############################################################################
+# cert-manager: gets Let's Encrypt certificates for the Ingresses and renews them
 resource "helm_release" "cert_manager" {
   name             = "cert-manager"
   repository       = "https://charts.jetstack.io"
@@ -159,10 +135,9 @@ resource "helm_release" "cert_manager" {
 
   values = [
     yamlencode({
-      # Installs cert-manager's own resource types (Certificate, ClusterIssuer, ...)
+      # installs the Certificate, ClusterIssuer, ... resource types
       crds = { enabled = true }
 
-      # Allow its pods on the node group that only accepts add-ons
       tolerations     = [{ key = "CriticalAddonsOnly", operator = "Exists", effect = "NoSchedule" }]
       webhook         = { tolerations = [{ key = "CriticalAddonsOnly", operator = "Exists", effect = "NoSchedule" }] }
       cainjector      = { tolerations = [{ key = "CriticalAddonsOnly", operator = "Exists", effect = "NoSchedule" }] }
@@ -173,9 +148,7 @@ resource "helm_release" "cert_manager" {
   depends_on = [helm_release.ingress-nginx]
 }
 
-###############################################################################
-# Let's Encrypt "suppliers" (staging for testing, prod for the real certificate)
-###############################################################################
+# Let's Encrypt issuers: staging for testing, prod for real certificates
 resource "kubectl_manifest" "cluster_issuers" {
   for_each = { for i, doc in split("---", templatefile("${path.root}/../../k8s/cert-manager/cluster-issuers.yaml", { email = var.letsencrypt_email })) : i => doc if trimspace(doc) != "" }
 

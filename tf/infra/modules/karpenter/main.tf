@@ -1,6 +1,4 @@
-###############################################################################
-# Karpenter submodule
-###############################################################################
+# IAM roles, SQS interruption queue and Pod Identity for Karpenter
 module "karpenter" {
   source  = "terraform-aws-modules/eks/aws//modules/karpenter"
   version = "21.23.0"
@@ -9,16 +7,13 @@ module "karpenter" {
 
   create_pod_identity_association = true
 
-  # Attach additional IAM policies to the Karpenter node IAM role
-  # When you add the policy to node_iam_role_additional_policies in Terraform, you are configuring the Worker Node's identity, not the Karpenter controller's identity.
+  # extra policy for the nodes Karpenter starts (not for the Karpenter controller),
+  # so we can open a shell on them with SSM
   node_iam_role_additional_policies = {
     AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
   }
 }
 
-###############################################################################
-# Install Karpenter via helm
-###############################################################################
 resource "helm_release" "karpenter" {
   namespace  = "kube-system"
   name       = "karpenter"
@@ -26,25 +21,11 @@ resource "helm_release" "karpenter" {
   chart      = "karpenter"
   version    = "1.12.1"
 
-  /*
-    Why `wait = false` for Karpenter?
-
-    By default, the Helm provider waits until all Kubernetes resources
-    are fully deployed and healthy before Terraform continues.
-
-    For Karpenter, this can sometimes cause installation deadlocks because
-    the controller needs to register and initialize its admission webhooks
-    before it can become fully ready. If Terraform waits for complete
-    readiness, the Helm release may time out and fail.
-
-    Setting `wait = false` allows Terraform to submit the Helm chart to
-    Kubernetes and continue immediately, letting Karpenter finish its
-    startup process asynchronously in the background.
-*/
+  # Don't wait for Karpenter to be ready. Waiting can time out while its webhooks
+  # start up; it finishes starting in the background.
   wait = false
 
-  # By default official, Karpeneter Helm chart automatically add CriticalAddonsOnly toleration to the Karpenter pods.
-
+  # The chart already adds the CriticalAddonsOnly toleration.
   values = [
     <<-EOT
     replicas: 1
@@ -60,7 +41,6 @@ resource "helm_release" "karpenter" {
   depends_on = [module.karpenter]
 }
 
-
 resource "kubectl_manifest" "karpenter_node_pool" {
   yaml_body = file("${path.root}/../../k8s/karpenter/karpenter-node-pool.yaml")
 
@@ -69,10 +49,6 @@ resource "kubectl_manifest" "karpenter_node_pool" {
   ]
 }
 
-
-###############################################################################
-# Apply Karpenter NodeClass YAML via kubectl provider
-###############################################################################
 resource "kubectl_manifest" "karpenter_node_class" {
   yaml_body = templatefile("${path.root}/../../k8s/karpenter/karpenter-node-class.yaml", {
     cluster_name = var.cluster_name
@@ -83,12 +59,9 @@ resource "kubectl_manifest" "karpenter_node_class" {
   ]
 }
 
-###############################################################################
-# Inflate deployment
-###############################################################################
+# test deployment for Karpenter scaling (scale it up to see new nodes)
 resource "kubectl_manifest" "inflate_deployment" {
   yaml_body = file("${path.root}/../../k8s/inflate/inflate-deployment.yaml")
-
 
   depends_on = [
     kubectl_manifest.karpenter_node_pool

@@ -1,6 +1,4 @@
-###############################################################################
-# Install Argo CD controller
-###############################################################################
+# Argo CD
 resource "helm_release" "argocd" {
   name             = "argocd"
   repository       = "https://argoproj.github.io/argo-helm"
@@ -9,31 +7,20 @@ resource "helm_release" "argocd" {
   create_namespace = true
 }
 
-###############################################################################
-# Argo CD UI over HTTPS at argocd.jawsight.online (ingress-nginx + cert-manager)
-###############################################################################
+# https://argocd.jawsight.online
 resource "kubectl_manifest" "argocd_ingress" {
   yaml_body = file("${path.root}/../../k8s/argocd/argocd-ingress.yaml")
 
   depends_on = [helm_release.argocd]
 }
 
-
-
-
-###############################################################################
-# Argo CD Project
-###############################################################################
+# the project and the app that Argo CD keeps in sync with the GitOps repo
 resource "kubectl_manifest" "argocd_project" {
   yaml_body = file("${path.root}/../../k8s/argocd/argocd-project.yaml")
 
   depends_on = [helm_release.argocd]
 }
 
-
-###############################################################################
-# Argo CD Application files
-###############################################################################
 resource "kubectl_manifest" "argocd_application" {
   yaml_body = file("${path.root}/../../k8s/argocd/argocd-app.yaml")
 

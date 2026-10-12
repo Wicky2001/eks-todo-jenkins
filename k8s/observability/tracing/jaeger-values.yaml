@@ -1,19 +1,16 @@
-# Jaeger v2 Helm values. Jaeger v2 is built on the OpenTelemetry Collector, so its config
-# below uses the Collector's layout: receivers → processors → exporters, plus extensions.
-#
-#   frontend / backend ──OTLP :4318──► receiver ──► batch ──► Elasticsearch "traces"
-#   Jaeger UI (:16686) ◄── jaeger_query ◄── Elasticsearch "traces"
+# Jaeger v2 values. Jaeger v2 is built on the OpenTelemetry Collector, so the config uses
+# its layout: receivers -> processors -> exporters, plus extensions.
+# Apps send spans to port 4318 (OTLP); the UI and Grafana query port 16686.
 
 jaeger:
-  # The password of jaeger-user, from the Secret Terraform creates in this namespace.
-  # The config below reads it as ${env:ES_PASSWORD}, so it is never written in git.
+  # jaeger-user's password (Secret made by Terraform), used below as ${env:ES_PASSWORD}
   extraEnv:
     - name: ES_PASSWORD
       valueFrom:
         secretKeyRef:
           name: jaeger-user
           key: password
-  # The CA that signed Elasticsearch's HTTPS certificate, so Jaeger can verify it.
+  # CA of the traces Elasticsearch, to verify its certificate
   extraVolumes:
     - name: es-ca
       secret:
@@ -58,7 +55,6 @@ userconfig:
         primary_store:
           elasticsearch:
             server_urls: ["https://traces-es-http.tracing.svc:9200"]
-            # Encrypted and verified against ECK's CA.
             tls:
               ca_file: /es-ca/ca.crt
             auth:

@@ -1,4 +1,4 @@
-# monitoring-storageclasses.yaml
+# gp3 disks for Prometheus, Alertmanager and Grafana
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

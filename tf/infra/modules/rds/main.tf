@@ -1,17 +1,14 @@
-###############################################################################
-# PostgreSQL on Amazon RDS
-###############################################################################
+# PostgreSQL on RDS
 
 data "aws_caller_identity" "current" {}
 
-# RDS needs subnets in at least two Availability Zones. We use the private ones,
-# so the database has no route from the internet.
+# private subnets in two zones, so the database can't be reached from the internet
 resource "aws_db_subnet_group" "this" {
   name       = "${var.cluster_name}-postgres"
   subnet_ids = var.private_subnets
 }
 
-# Network lock: only the EKS worker nodes (where all pods run) can reach port 5432.
+# only the EKS worker nodes can reach port 5432
 resource "aws_security_group" "rds" {
   name        = "${var.cluster_name}-postgres"
   description = "PostgreSQL access from the EKS worker nodes only"
@@ -40,12 +37,11 @@ resource "aws_db_instance" "this" {
   db_name  = var.db_name
   username = "dbadmin"
 
-  # RDS creates the admin password itself and keeps it in AWS Secrets Manager,
-  # so it never appears in Terraform code or state.
+  # RDS generates the admin password and keeps it in Secrets Manager,
+  # so it is never in the code or the Terraform state.
   manage_master_user_password = true
 
-  # Identity lock: users that have the rds_iam role log in with a short-lived
-  # IAM token instead of a password.
+  # Users with the rds_iam role log in with a short-lived IAM token instead of a password.
   iam_database_authentication_enabled = true
 
   db_subnet_group_name   = aws_db_subnet_group.this.name
@@ -57,18 +53,13 @@ resource "aws_db_instance" "this" {
   auto_minor_version_upgrade = true
   apply_immediately          = true
 
-  # Learning setup: destroying the stack deletes the database without a final snapshot.
+  # learning setup: terraform destroy removes the database without a final snapshot
   skip_final_snapshot = true
   deletion_protection = false
 }
 
-###############################################################################
-# IAM role for the backend pod (EKS Pod Identity)
-###############################################################################
-
-# The role can do exactly one thing: ask for a login token for the "todo_app_db_user"
-# database user on this one database server. Pod Identity gives the role only to pods
-# that run as the backend ServiceAccount in the app namespace.
+# IAM role for the backend pod (Pod Identity). It can only get a login token for the
+# app's database user on this database, and only pods using the backend ServiceAccount get it.
 module "backend_pod_identity" {
   source = "terraform-aws-modules/eks-pod-identity/aws"
 
@@ -94,9 +85,7 @@ module "backend_pod_identity" {
   }
 }
 
-###############################################################################
-# Connection settings for the pods (the database address is only known after RDS exists)
-###############################################################################
+# Database address for the backend and migration pods (only known once RDS exists)
 resource "kubernetes_config_map_v1" "backend_db" {
   metadata {
     name      = "backend-db-config"
