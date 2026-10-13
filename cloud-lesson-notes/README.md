@@ -12,6 +12,8 @@ Notes written while learning how this project works on AWS. Read them in this or
 | 6 | [Prometheus stack monitoring](prometheus-stack-monitoring.md) | How prom-client, Prometheus, Alertmanager and Grafana fit together, who pulls from whom, and why each one has its own database. |
 | 7 | [Tracing](tracing.md) | Traces and spans, the OpenTelemetry and Jaeger components for the frontend and backend, how to read a trace timeline, and how self time shows what is slow. |
 | 8 | [Grafana for metrics, logs and traces](grafana-metrics-logs-traces.md) | Grafana as the one UI: which backend each signal comes from, why traces go through Jaeger, the two Elasticsearch databases, users, and sharing the CA with trust-manager. |
+| 9 | [Pod-to-pod traffic: Services, kube-proxy and ztunnel](pod-to-pod-traffic-service-and-ztunnel.md) | How a Service and kube-proxy pick a pod, and how Istio ambient mode does the same with ztunnel: the redirect rule, the sockets inside every pod, and the encrypted tunnel. |
+| 10 | [What is inside the mesh, and why](what-is-inside-the-mesh.md) | Which namespaces join the mesh and which stay out, which connections already have their own TLS, and the interview answer. |
 
 Other how-to notes live next to the code they describe:
 
