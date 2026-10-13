@@ -1,0 +1,22 @@
+# Changes to the Envoy pods that istiod creates for main-gateway.
+# main-gateway.yaml points here with infrastructure.parametersRef.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: main-gateway-options
+  namespace: istio-ingress
+data:
+  deployment: |
+    spec:
+      replicas: 2
+      template:
+        spec:
+          # may also run on the add-on nodes
+          tolerations:
+            - key: CriticalAddonsOnly
+              operator: Exists
+              effect: NoSchedule
+  # keep at least one pod running when Karpenter replaces a node
+  podDisruptionBudget: |
+    spec:
+      minAvailable: 1

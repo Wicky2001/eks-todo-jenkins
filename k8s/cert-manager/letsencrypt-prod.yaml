@@ -1,0 +1,21 @@
+# Let's Encrypt production: real, trusted certificates. Limit: 5 per week for the same name.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ${email}
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          # Let's Encrypt visits http://<name>/.well-known/acme-challenge/... and
+          # cert-manager answers through the port 80 listener of main-gateway
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: main-gateway
+                namespace: istio-ingress
+                kind: Gateway
+                sectionName: http

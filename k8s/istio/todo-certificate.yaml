@@ -1,0 +1,17 @@
+# HTTPS certificate for todo.jawsight.online.
+# cert-manager gets it from Let's Encrypt and saves it in the Secret todo-tls.
+# main-gateway's listener todo-https shows that Secret to visitors.
+# It lives in istio-ingress, next to the Gateway, so only the platform team can read it.
+# Switch issuerRef to letsencrypt-prod once staging works (limit: 5 per week per name).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: todo
+  namespace: istio-ingress
+spec:
+  secretName: todo-tls
+  dnsNames:
+    - todo.jawsight.online
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-staging

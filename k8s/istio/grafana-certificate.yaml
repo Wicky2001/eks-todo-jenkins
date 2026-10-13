@@ -1,0 +1,16 @@
+# HTTPS certificate for grafana.jawsight.online.
+# cert-manager gets it from Let's Encrypt and saves it in the Secret grafana-tls.
+# main-gateway's listener grafana-https shows that Secret to visitors.
+# It lives in istio-ingress, next to the Gateway, so only the platform team can read it.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana
+  namespace: istio-ingress
+spec:
+  secretName: grafana-tls
+  dnsNames:
+    - grafana.jawsight.online
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod

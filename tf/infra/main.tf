@@ -69,7 +69,7 @@ provider "helm" {
   }
 }
 
-# kubectl provider: applies plain YAML files (NodePool, Ingresses, ...)
+# kubectl provider: applies plain YAML files (NodePool, HTTPRoutes, ...)
 provider "kubectl" {
   apply_retry_count      = 5
   host                   = module.eks.cluster_endpoint
@@ -106,16 +106,54 @@ module "karpenter" {
   cluster_endpoint = module.eks.cluster_endpoint
 }
 
-module "addons" {
-  source = "./modules/addons"
+# Cluster add-ons, one module each. EKS-managed add-ons (CoreDNS, EBS CSI, ...) are in the eks module.
+
+# AWS Load Balancer Controller: turns LoadBalancer Services into NLBs
+module "aws_addons" {
+  source = "./modules/aws-addons"
 
   cluster_name = module.eks.cluster_name
   region       = var.region
   vpc_id       = module.vpc.vpc_id
 
-  letsencrypt_email = var.letsencrypt_email
+  depends_on = [module.eks]
+}
+
+module "metrics_server" {
+  source = "./modules/metrics-server"
 
   depends_on = [module.eks]
+}
+
+module "sealed_secrets" {
+  source = "./modules/sealed-secrets"
+
+  depends_on = [module.eks]
+}
+
+# Gateway API CRDs (Gateway, HTTPRoute, ...). Not built into Kubernetes.
+module "gateway_api_crds" {
+  source = "./modules/gateway-api-crds"
+
+  depends_on = [module.eks]
+}
+
+# cert-manager writes temporary HTTPRoutes for the Let's Encrypt check,
+# so the Gateway API CRDs must exist before it starts
+module "cert_manager" {
+  source = "./modules/cert-manager"
+
+  letsencrypt_email = var.letsencrypt_email
+
+  depends_on = [module.gateway_api_crds]
+}
+
+# Istio + main-gateway (the front door). The gateway needs cert-manager for its
+# certificates and the AWS Load Balancer Controller for its NLB.
+module "istio" {
+  source = "./modules/istio"
+
+  depends_on = [module.gateway_api_crds, module.cert_manager, module.aws_addons]
 }
 
 module "ecr" {
@@ -143,8 +181,7 @@ module "rds" {
   app_namespace          = kubernetes_namespace_v1.app.metadata[0].name
 }
 
-# Modules with an Ingress wait for addons: the ingress-nginx webhook and cert-manager
-# have to be running before an Ingress can be created.
+# Modules with an HTTPRoute wait for main-gateway (in the istio module).
 module "argocd" {
   source = "./modules/argocd"
 
@@ -153,7 +190,7 @@ module "argocd" {
   github_client_id     = var.argocd_github_client_id
   github_client_secret = var.argocd_github_client_secret
 
-  depends_on = [module.addons]
+  depends_on = [module.istio]
 }
 
 module "monitoring" {
@@ -168,14 +205,15 @@ module "monitoring" {
   github_client_secret = var.grafana_github_client_secret
 
   # also waits for logging, so the Elasticsearch CA copy exists before Grafana starts
-  depends_on = [module.addons, module.logging]
+  depends_on = [module.istio, module.logging]
 }
 
 module "logging" {
   source = "./modules/logging"
 
-  # Elasticsearch needs the EBS CSI driver (eks addons) and Karpenter nodes to run on
-  depends_on = [module.addons, module.karpenter]
+  # trust-manager needs cert-manager. Elasticsearch needs the EBS CSI driver
+  # (eks module) and Karpenter nodes to run on.
+  depends_on = [module.cert_manager, module.karpenter]
 }
 
 module "tracing" {

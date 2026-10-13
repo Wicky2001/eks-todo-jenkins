@@ -9,7 +9,3 @@ variable "region" {
 variable "vpc_id" {
   type = string
 }
-
-variable "letsencrypt_email" {
-  type = string
-}

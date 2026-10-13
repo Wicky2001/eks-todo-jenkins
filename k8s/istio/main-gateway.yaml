@@ -1,0 +1,84 @@
+# The one front door for todo, argocd and grafana (replaces ingress-nginx).
+# istiod sees this Gateway and creates Envoy pods plus a LoadBalancer Service named
+# main-gateway-istio, and the AWS Load Balancer Controller turns that Service into an NLB.
+# Namecheap CNAMEs todo, argocd and grafana must point to that NLB.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: main-gateway
+  namespace: istio-ingress
+spec:
+  gatewayClassName: istio
+
+  infrastructure:
+    # copied onto the generated Service, so the AWS Load Balancer Controller makes an NLB
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "external"
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+      # keep the visitor's real IP (nginx used proxy protocol for this)
+      service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "preserve_client_ip.enabled=true"
+    # replicas, tolerations, ... for the generated pods (in main-gateway-options.yaml)
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: main-gateway-options
+
+  listeners:
+    # Port 80: only redirects to HTTPS (http-redirect.yaml) and answers the
+    # Let's Encrypt check. Only routes from this namespace may attach.
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: Same
+
+    # One HTTPS listener per site. Each one only accepts routes from its own namespace,
+    # so no other team can take over the name. Certificates come from the *-certificate.yaml files.
+    - name: todo-https
+      hostname: todo.jawsight.online
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: todo-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              kubernetes.io/metadata.name: app
+
+    - name: argocd-https
+      hostname: argocd.jawsight.online
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: argocd-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              kubernetes.io/metadata.name: argocd
+
+    - name: grafana-https
+      hostname: grafana.jawsight.online
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: grafana-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+              

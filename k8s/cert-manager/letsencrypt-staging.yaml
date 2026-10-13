@@ -1,0 +1,22 @@
+# Let's Encrypt staging: browsers don't trust these certificates, but the rate limits
+# are high. Use it to test first.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: ${email}
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          # Let's Encrypt visits http://<name>/.well-known/acme-challenge/... and
+          # cert-manager answers through the port 80 listener of main-gateway
+          gatewayHTTPRoute:
+            parentRefs:
+              - name: main-gateway
+                namespace: istio-ingress
+                kind: Gateway
+                sectionName: http

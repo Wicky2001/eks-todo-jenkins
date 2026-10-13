@@ -4,7 +4,7 @@
 #
 # Why not just `terraform destroy`? Some AWS resources are created by controllers
 # inside the cluster, so Terraform does not know about them:
-#   - the NLB (made by the AWS Load Balancer Controller for the ingress-nginx Service)
+#   - the NLB (made by the AWS Load Balancer Controller for the Istio gateway Service)
 #   - EC2 nodes (made by Karpenter)
 #   - EBS volumes (made by the EBS CSI driver for the monitoring PVCs)
 # If the cluster is deleted first, nobody is left to delete them. The NLB and the
@@ -46,6 +46,10 @@ if aws eks describe-cluster --name "$CLUSTER" --region "$REGION" >/dev/null 2>&1
 
   step "Stop Argo CD from recreating the app"
   kubectl delete applications.argoproj.io --all -n argocd --ignore-not-found --wait=true || true
+
+  # istiod recreates the gateway Service while the Gateway exists, so delete the Gateway first
+  step "Delete the Gateways, so istiod removes the gateway pods and Service"
+  kubectl delete gateways.gateway.networking.k8s.io --all -A --ignore-not-found --wait=true 2>/dev/null || true
 
   step "Delete every LoadBalancer Service, so the controller deletes its NLB"
   kubectl get svc -A -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' |
