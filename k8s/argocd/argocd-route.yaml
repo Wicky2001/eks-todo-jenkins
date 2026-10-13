@@ -1,0 +1,21 @@
+# https://argocd.jawsight.online, through main-gateway (HTTPS ends at the gateway).
+# Needs a Namecheap CNAME "argocd" pointing to the gateway's NLB.
+# The argocd CLI needs --grpc-web when it goes through here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd-server
+  # next to the argocd-server Service
+  namespace: argocd
+spec:
+  parentRefs:
+    - name: main-gateway
+      namespace: istio-ingress
+      sectionName: argocd-https
+  hostnames:
+    - argocd.jawsight.online
+  rules:
+    - backendRefs:
+        # plain HTTP (server.insecure in helm-values.yaml)
+        - name: argocd-server
+          port: 80

@@ -30,9 +30,9 @@ resource "kubernetes_secret_v1" "argocd_github_oauth" {
   }
 }
 
-# https://argocd.jawsight.online
-resource "kubectl_manifest" "argocd_ingress" {
-  yaml_body = file("${path.root}/../../k8s/argocd/argocd-ingress.yaml")
+# https://argocd.jawsight.online (an HTTPRoute on main-gateway)
+resource "kubectl_manifest" "argocd_route" {
+  yaml_body = file("${path.root}/../../k8s/argocd/argocd-route.yaml")
 
   depends_on = [helm_release.argocd]
 }

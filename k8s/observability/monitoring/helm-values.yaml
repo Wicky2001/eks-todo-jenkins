@@ -10,7 +10,7 @@ grafana:
     passwordKey: admin-password
 
   # Public address, needed for links and login redirects.
-  # The Ingress itself is in grafana-ingress.yaml.
+  # The route itself is in grafana-route.yaml.
   grafana.ini:
     server:
       root_url: https://grafana.jawsight.online

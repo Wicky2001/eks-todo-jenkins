@@ -87,9 +87,9 @@ resource "helm_release" "monitoring" {
   ]
 }
 
-# https://grafana.jawsight.online
-resource "kubectl_manifest" "grafana_ingress" {
-  yaml_body = file("${path.root}/../../k8s/observability/monitoring/grafana-ingress.yaml")
+# https://grafana.jawsight.online (an HTTPRoute on main-gateway)
+resource "kubectl_manifest" "grafana_route" {
+  yaml_body = file("${path.root}/../../k8s/observability/monitoring/grafana-route.yaml")
 
   depends_on = [helm_release.monitoring]
 }
