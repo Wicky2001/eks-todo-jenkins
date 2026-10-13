@@ -21,6 +21,12 @@ spec:
       config:
         node.store.allow_mmap: false
       podTemplate:
+        metadata:
+          labels:
+            # The tracing namespace is in the Istio mesh, but this pod stays out:
+            # Elasticsearch already does its own TLS, and Jaeger logs in with
+            # jaeger-user. The mesh would only encrypt it a second time.
+            istio.io/dataplane-mode: none
         spec:
           containers:
             - name: elasticsearch

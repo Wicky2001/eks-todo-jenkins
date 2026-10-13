@@ -1,10 +1,22 @@
 # Argo CD
+
+# created here instead of by Helm, so it can carry the mesh label
+resource "kubernetes_namespace_v1" "argocd" {
+  metadata {
+    name = "argocd"
+    # join the Istio mesh (ambient mode): gateway -> argocd-server and the traffic
+    # between the Argo CD parts get mTLS
+    labels = {
+      "istio.io/dataplane-mode" = "ambient"
+    }
+  }
+}
+
 resource "helm_release" "argocd" {
-  name             = "argocd"
-  repository       = "https://argoproj.github.io/argo-helm"
-  chart            = "argo-cd"
-  namespace        = "argocd"
-  create_namespace = true
+  name       = "argocd"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argo-cd"
+  namespace  = kubernetes_namespace_v1.argocd.metadata[0].name
 
   values = [
     file("${path.root}/../../k8s/argocd/helm-values.yaml"),

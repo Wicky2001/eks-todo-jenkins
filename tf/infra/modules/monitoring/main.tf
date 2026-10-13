@@ -17,6 +17,10 @@ resource "kubectl_manifest" "grafana_sc" {
 resource "kubernetes_namespace_v1" "monitoring" {
   metadata {
     name = "monitoring"
+    # join the Istio mesh (ambient mode): pod-to-pod traffic gets mTLS
+    labels = {
+      "istio.io/dataplane-mode" = "ambient"
+    }
   }
 }
 

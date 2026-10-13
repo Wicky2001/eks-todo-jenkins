@@ -4,6 +4,11 @@
 resource "kubernetes_namespace_v1" "tracing" {
   metadata {
     name = "tracing"
+    # join the Istio mesh (ambient mode), so backend -> Jaeger and Grafana -> Jaeger
+    # get mTLS. The Elasticsearch pod opts out (it has its own TLS, see elasticsearch.yaml).
+    labels = {
+      "istio.io/dataplane-mode" = "ambient"
+    }
   }
 }
 

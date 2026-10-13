@@ -165,6 +165,10 @@ module "ecr" {
 resource "kubernetes_namespace_v1" "app" {
   metadata {
     name = "app"
+    # join the Istio mesh (ambient mode): pod-to-pod traffic gets mTLS
+    labels = {
+      "istio.io/dataplane-mode" = "ambient"
+    }
   }
 
   depends_on = [module.eks]
@@ -219,6 +223,7 @@ module "logging" {
 module "tracing" {
   source = "./modules/tracing"
 
-  # uses the ECK operator and the elasticsearch-sc storage class from logging
-  depends_on = [module.logging]
+  # uses the ECK operator and the elasticsearch-sc storage class from logging.
+  # Waits for istio too, because its namespace joins the mesh.
+  depends_on = [module.logging, module.istio]
 }
