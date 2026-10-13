@@ -42,6 +42,17 @@ resource "kubernetes_secret_v1" "grafana_es_credentials" {
   }
 }
 
+# GitHub OAuth App secret for "Log in with GitHub"
+resource "kubernetes_secret_v1" "grafana_github_oauth" {
+  metadata {
+    name      = "grafana-github-oauth"
+    namespace = kubernetes_namespace_v1.monitoring.metadata[0].name
+  }
+  data = {
+    client-secret = var.github_client_secret
+  }
+}
+
 resource "helm_release" "monitoring" {
   name       = "monitoring"
   repository = "https://prometheus-community.github.io/helm-charts"
@@ -51,6 +62,10 @@ resource "helm_release" "monitoring" {
 
   values = [
     file("${path.root}/../../k8s/observability/monitoring/helm-values.yaml"),
+    templatefile("${path.root}/../../k8s/observability/monitoring/grafana-github-sso.yaml", {
+      github_org = var.github_org
+      client_id  = var.github_client_id
+    }),
     yamlencode({
       prometheus-node-exporter = {
         tolerations = [
@@ -68,6 +83,7 @@ resource "helm_release" "monitoring" {
     kubectl_manifest.prometheus_storage_classes,
     kubernetes_secret_v1.grafana_admin,
     kubernetes_secret_v1.grafana_es_credentials,
+    kubernetes_secret_v1.grafana_github_oauth,
   ]
 }
 

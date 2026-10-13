@@ -1,0 +1,31 @@
+# Log in to Argo CD with GitHub (values for the argo-cd chart).
+# Terraform fills in the GitHub org name and client ID.
+
+configs:
+  cm:
+    # Public address. Dex uses it to build the callback URL:
+    # https://argocd.jawsight.online/api/dex/callback (must match the GitHub OAuth App)
+    url: https://argocd.jawsight.online
+
+    # Log in with GitHub through Dex. Only members of the org can log in, and their
+    # teams come back as groups named "<org>:<team>".
+    # $argocd-github-oauth:clientSecret means "key clientSecret in Secret argocd-github-oauth".
+    dex.config: |
+      connectors:
+        - type: github
+          id: github
+          name: GitHub
+          config:
+            clientID: ${client_id}
+            clientSecret: $argocd-github-oauth:clientSecret
+            orgs:
+              - name: ${github_org}
+            teamNameField: slug
+
+  rbac:
+    # Not in one of the teams below = logged in but can't see anything.
+    policy.default: ""
+    policy.csv: |
+      g, ${github_org}:platform, role:admin
+      g, ${github_org}:developers, role:readonly
+      

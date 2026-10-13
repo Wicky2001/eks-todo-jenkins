@@ -148,6 +148,11 @@ module "rds" {
 module "argocd" {
   source = "./modules/argocd"
 
+  # log in with GitHub
+  github_org           = var.github_org
+  github_client_id     = var.argocd_github_client_id
+  github_client_secret = var.argocd_github_client_secret
+
   depends_on = [module.addons]
 }
 
@@ -156,6 +161,11 @@ module "monitoring" {
 
   # Grafana reads logs as grafana-user, created in the logging module
   grafana_es_password = module.logging.grafana_es_password
+
+  # log in with GitHub
+  github_org           = var.github_org
+  github_client_id     = var.grafana_github_client_id
+  github_client_secret = var.grafana_github_client_secret
 
   # also waits for logging, so the Elasticsearch CA copy exists before Grafana starts
   depends_on = [module.addons, module.logging]

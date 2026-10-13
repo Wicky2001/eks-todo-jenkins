@@ -21,3 +21,26 @@ variable "project_name" {
 variable "letsencrypt_email" {
   type = string
 }
+
+# GitHub login for Argo CD and Grafana (one OAuth App each, owned by the GitHub org)
+variable "github_org" {
+  type = string
+}
+
+variable "argocd_github_client_id" {
+  type = string
+}
+
+variable "argocd_github_client_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "grafana_github_client_id" {
+  type = string
+}
+
+variable "grafana_github_client_secret" {
+  type      = string
+  sensitive = true
+}
