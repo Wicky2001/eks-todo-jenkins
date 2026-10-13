@@ -7,6 +7,7 @@ resource "helm_release" "argocd" {
   create_namespace = true
 
   values = [
+    file("${path.root}/../../k8s/argocd/helm-values.yaml"),
     templatefile("${path.root}/../../k8s/argocd/argocd-github-sso.yaml", {
       github_org = var.github_org
       client_id  = var.github_client_id

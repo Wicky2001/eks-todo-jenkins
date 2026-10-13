@@ -1,0 +1,8 @@
+# Values for the argo-cd chart (GitHub login is in argocd-github-sso.yaml).
+
+configs:
+  params:
+    # Serve plain HTTP. HTTPS ends at main-gateway, and Istio will encrypt the
+    # gateway -> Argo CD hop. Without this, argocd-server only serves its own
+    # self-signed HTTPS.
+    server.insecure: true
