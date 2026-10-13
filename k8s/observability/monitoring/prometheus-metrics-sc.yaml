@@ -1,0 +1,13 @@
+# gp3 EBS disk type for Prometheus (the metrics database)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: prometheus-metrics-sc
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  tagSpecification_1: "Name=prometheus-metrics-ebs"
+  tagSpecification_2: "Project=EKS-Todo"
+  tagSpecification_3: "Component=Metrics"

@@ -1,5 +1,5 @@
 # Values for the kube-prometheus-stack chart (Prometheus, Alertmanager, Grafana).
-# The storage classes used below come from storage-classes.yaml. Terraform applies
+# The storage classes used below come from the *-sc.yaml files next to this one. Terraform applies
 # them before this chart, otherwise the disks would stay Pending.
 
 grafana:

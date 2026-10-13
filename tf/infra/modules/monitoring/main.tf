@@ -1,9 +1,16 @@
 # Metrics: Prometheus, Alertmanager and Grafana (kube-prometheus-stack)
 
-# storage classes for the Prometheus, Alertmanager and Grafana disks (one per --- document)
-resource "kubectl_manifest" "prometheus_storage_classes" {
-  for_each  = { for i, doc in split("---", file("${path.root}/../../k8s/observability/monitoring/storage-classes.yaml")) : i => doc if trimspace(doc) != "" }
-  yaml_body = each.value
+# disk types (storage classes) for Prometheus, Alertmanager and Grafana
+resource "kubectl_manifest" "prometheus_metrics_sc" {
+  yaml_body = file("${path.root}/../../k8s/observability/monitoring/prometheus-metrics-sc.yaml")
+}
+
+resource "kubectl_manifest" "alertmanager_alerts_sc" {
+  yaml_body = file("${path.root}/../../k8s/observability/monitoring/alertmanager-alerts-sc.yaml")
+}
+
+resource "kubectl_manifest" "grafana_sc" {
+  yaml_body = file("${path.root}/../../k8s/observability/monitoring/grafana-sc.yaml")
 }
 
 # created here instead of by Helm, so the Secrets below exist before Grafana starts
@@ -80,7 +87,9 @@ resource "helm_release" "monitoring" {
   ]
 
   depends_on = [
-    kubectl_manifest.prometheus_storage_classes,
+    kubectl_manifest.prometheus_metrics_sc,
+    kubectl_manifest.alertmanager_alerts_sc,
+    kubectl_manifest.grafana_sc,
     kubernetes_secret_v1.grafana_admin,
     kubernetes_secret_v1.grafana_es_credentials,
     kubernetes_secret_v1.grafana_github_oauth,

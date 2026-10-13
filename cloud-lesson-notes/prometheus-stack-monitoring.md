@@ -69,7 +69,7 @@ Two settings objects steer Prometheus:
 | **Grafana SQLite** | Grafana's own settings: dashboards, users, data sources. **No metrics.** | EBS 10 GiB, `grafana-sc` | your dashboards and users |
 | **Alertmanager data** | silences ("mute this alert until 6 pm") and who was already notified | EBS 10 GiB, `alertmanager-alerts-sc` | silences, and some emails repeat |
 
-The storage classes are in [`storage-classes.yaml`](../k8s/observability/monitoring/storage-classes.yaml) and the disk sizes in [`helm-values.yaml`](../k8s/observability/monitoring/helm-values.yaml).
+The storage classes are in [`prometheus-metrics-sc.yaml`](../k8s/observability/monitoring/prometheus-metrics-sc.yaml), [`alertmanager-alerts-sc.yaml`](../k8s/observability/monitoring/alertmanager-alerts-sc.yaml) and [`grafana-sc.yaml`](../k8s/observability/monitoring/grafana-sc.yaml) and the disk sizes in [`helm-values.yaml`](../k8s/observability/monitoring/helm-values.yaml).
 
 ## Pull, not push
 
