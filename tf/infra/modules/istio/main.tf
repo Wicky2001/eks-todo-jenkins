@@ -1,31 +1,80 @@
-# Istio and the cluster's front door (main-gateway)
+# Istio in ambient mode, and the cluster's front door (main-gateway)
 
-# Istio: "base" installs Istio's own resource types, istiod is the control plane.
-# istiod also runs the Gateway objects: for each one it creates Envoy pods and a
-# LoadBalancer Service (which becomes the NLB).
+# Istio moved its charts here; the old istio-release.storage.googleapis.com is being shut down.
+# Images come from Docker Hub, because the charts' default registry is being retired too.
+locals {
+  istio_charts  = "https://blob.istio.io/istio-release/charts"
+  istio_version = "1.30.5"
+  istio_images  = "docker.io/istio"
+}
+
+# Istio's own resource types (PeerAuthentication, AuthorizationPolicy, ...)
 resource "helm_release" "istio_base" {
   name             = "istio-base"
-  repository       = "https://istio-release.storage.googleapis.com/charts"
+  repository       = local.istio_charts
   chart            = "base"
   namespace        = "istio-system"
   create_namespace = true
-  version          = "1.30.5"
+  version          = local.istio_version
 }
 
+# istiod: the brain. Watches Services, sends member lists to ztunnel and Envoy, and
+# gives every mesh pod an ID certificate. It also runs the Gateway objects: for each
+# one it creates Envoy pods and a LoadBalancer Service (which becomes the NLB).
 resource "helm_release" "istiod" {
   name       = "istiod"
-  repository = "https://istio-release.storage.googleapis.com/charts"
+  repository = local.istio_charts
   chart      = "istiod"
   namespace  = helm_release.istio_base.namespace
-  version    = "1.30.5"
+  version    = local.istio_version
 
   values = [
     yamlencode({
+      profile     = "ambient"
+      global      = { hub = local.istio_images }
       tolerations = [{ key = "CriticalAddonsOnly", operator = "Exists", effect = "NoSchedule" }]
     })
   ]
 
   depends_on = [helm_release.istio_base]
+}
+
+# istio-cni (DaemonSet, one per node): when a pod starts in a mesh namespace, it adds
+# the redirect rule inside the pod and gives ztunnel a key to the pod's network.
+# It already runs on every node and skips kube-system by default.
+resource "helm_release" "istio_cni" {
+  name       = "istio-cni"
+  repository = local.istio_charts
+  chart      = "cni"
+  namespace  = helm_release.istio_base.namespace
+  version    = local.istio_version
+
+  values = [
+    yamlencode({
+      profile = "ambient"
+      global  = { hub = local.istio_images }
+    })
+  ]
+
+  depends_on = [helm_release.istiod]
+}
+
+# ztunnel (DaemonSet, one per node): opens sockets inside every mesh pod on its node
+# and carries pod-to-pod traffic through encrypted mTLS tunnels
+resource "helm_release" "ztunnel" {
+  name       = "ztunnel"
+  repository = local.istio_charts
+  chart      = "ztunnel"
+  namespace  = helm_release.istio_base.namespace
+  version    = local.istio_version
+
+  values = [
+    yamlencode({
+      hub = local.istio_images
+    })
+  ]
+
+  depends_on = [helm_release.istio_cni]
 }
 
 # The front door: one Gateway for todo, argocd and grafana.
