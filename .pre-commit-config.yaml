@@ -1,0 +1,19 @@
+# Checks that run before every commit, using the pre-commit framework (https://pre-commit.com).
+#
+# One-time setup on each machine, inside this repo:
+#   pip install pre-commit
+#   pre-commit install --install-hooks    # adds .git/hooks/pre-commit and builds the tools now
+#
+# After that, every "git commit" runs the hooks below on the staged changes only.
+# Skip once (only if you are sure): SKIP=gitleaks git commit -m "..."
+# Update the versions below:        pre-commit autoupdate
+
+repos:
+  # gitleaks: blocks the commit if the staged changes contain a password, token or key.
+  # pre-commit builds gitleaks with Go into its own cache the first time, then reuses it.
+  # It runs: gitleaks git --pre-commit --redact --staged --verbose
+  # (--redact hides the secret in the output)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

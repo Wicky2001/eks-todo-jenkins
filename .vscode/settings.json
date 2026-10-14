@@ -1,0 +1,6 @@
+{
+  // VS Code hides .git by default. Show it in this repo, to see .git/hooks/pre-commit.
+  "files.exclude": {
+    "**/.git": false
+  }
+}
