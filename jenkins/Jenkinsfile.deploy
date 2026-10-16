@@ -59,6 +59,33 @@ pipeline {
             }
         }
 
+        // Stops the deploy if a pushed commit adds a secret, before any image is built.
+        // gitleaks is installed in the agent image (jenkins/images/Dockerfile.agent).
+        // It scans the commits since the last successful deploy. On the very first build
+        // there is no previous commit, so it scans the whole history (known old findings
+        // are listed in .gitleaksignore).
+        stage('Secret scan (gitleaks)') {
+            steps {
+                sh '''
+                    if [ -n "$GIT_PREVIOUS_SUCCESSFUL_COMMIT" ]; then
+                        RANGE="${GIT_PREVIOUS_SUCCESSFUL_COMMIT}..${GIT_COMMIT}"
+                    else
+                        RANGE="${GIT_COMMIT}"
+                    fi
+                    echo "gitleaks: scanning ${RANGE}"
+                    gitleaks git . \
+                      --log-opts="${RANGE}" \
+                      --redact --no-banner \
+                      --report-format sarif --report-path gitleaks-report.sarif
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'gitleaks-report.sarif', allowEmptyArchive: true
+                }
+            }
+        }
+
         stage('Debug: Check IAM role') {
             steps {
                 sh 'aws sts get-caller-identity'

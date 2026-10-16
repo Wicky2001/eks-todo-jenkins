@@ -20,6 +20,28 @@ pipeline {
             }
         }
 
+        // Fails the PR if any commit in it adds a secret. gitleaks is installed in the
+        // agent image (jenkins/images/Dockerfile.agent). "gitleaks git" reads what each
+        // commit added; --log-opts limits it to the commits that are in this PR but not
+        // yet in the target branch. Known old findings are listed in .gitleaksignore.
+        stage('Secret scan (gitleaks)') {
+            steps {
+                sh '''
+                    TARGET="${CHANGE_TARGET:-main}"
+                    git fetch --no-tags origin "+refs/heads/${TARGET}:refs/remotes/origin/${TARGET}"
+                    gitleaks git . \
+                      --log-opts="origin/${TARGET}..HEAD" \
+                      --redact --no-banner \
+                      --report-format sarif --report-path gitleaks-report.sarif
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'gitleaks-report.sarif', allowEmptyArchive: true
+                }
+            }
+        }
+
         stage('SonarCloud Analysis') {
             steps {
 
