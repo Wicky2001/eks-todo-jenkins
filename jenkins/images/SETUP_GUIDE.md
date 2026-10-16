@@ -129,6 +129,7 @@ No space after each `\`.
 ```bash
 docker exec agent1 docker version
 docker exec agent1 aws --version
+docker exec agent1 gitleaks version
 ```
 
 ## What the deploy pipeline does
