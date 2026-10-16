@@ -1,0 +1,11 @@
+# Old gitleaks findings that are known and safe. gitleaks skips exactly these, by fingerprint
+# (commit:file:rule:line). Any other secret, old or new, still fails the scan.
+# Only add a line here after the secret is confirmed fake, or rotated and dead.
+
+# Made-up AWS key, written on purpose to make the SonarCloud Quality Gate fail
+# (commit "test: intentionally bad code to verify the Quality Gate blocks a failing PR").
+865adcbf3ac2f0529b413d0aeed57a65a1634b8c:backend/src/tempQualityGateTest.js:aws-access-token:8
+
+# Old Elasticsearch "elastic" password in the old Jaeger values. That cluster is destroyed,
+# and Jaeger now logs in as jaeger-user with a Terraform-generated password.
+eb273c7c2af06f770e030024927a93c56d40b9c1:k8s/observability/jaeger/helm-values.yaml:generic-api-key:44
