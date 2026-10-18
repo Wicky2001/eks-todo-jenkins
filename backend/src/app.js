@@ -4,10 +4,15 @@ const morgan = require('morgan');
 const promClient = require('prom-client');
 
 const todoRoutes = require('./routes/todoRoutes');
+const healthRoutes = require('./routes/healthRoutes');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 app.set("trust proxy", true);
+
+// Health endpoints first: Kubernetes calls them every few seconds, so they skip the
+// request log (morgan) and the Prometheus request counters below.
+app.use(healthRoutes);
 
 // In production the frontend and backend share one origin (the ingress), so no
 // CORS is needed. Locally they run on different ports, so enable it there only.
@@ -81,10 +86,6 @@ app.get('/metrics', async (req, res) => {
 
 
 
-
-app.get('/health', (_request, response) => {
-  response.json({ status: 'ok' });
-});
 
 app.use('/api/todos', todoRoutes);
 

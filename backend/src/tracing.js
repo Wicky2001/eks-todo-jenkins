@@ -60,9 +60,14 @@ try {
         applyCustomAttributesOnSpan: (span, request, response) => {
           span.setAttribute("custom-attribute", "custom-value");
         },
+        // Kubernetes calls the probe endpoints every few seconds; don't make traces for them
+        ignoreIncomingRequestHook: (request) =>
+          request.url === "/livez" || request.url === "/readyz",
       }),
-      new ExpressInstrumentation(), 
-      new PgInstrumentation(),
+      new ExpressInstrumentation(),
+      // Only trace database queries that belong to a request (so the readiness
+      // "SELECT 1" and the startup connection check don't become traces of their own)
+      new PgInstrumentation({ requireParentSpan: true }),
     ],
   });
 
