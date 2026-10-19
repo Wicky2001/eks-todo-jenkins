@@ -116,10 +116,10 @@ flowchart LR
 ## Questions people ask
 
 **Does Fluent Bit use TLS to Elasticsearch?**
-Yes. `tls On`, `tls.verify On`, the Elasticsearch CA from `logs-es-http-certs-public`, and its own user `fluentbit-user` (see `k8s/observability/logging/fluent-bit-values.yaml`).
+Yes. `tls On`, `tls.verify On`, the Elasticsearch CA from `logs-es-http-certs-public`, and its own user `fluentbit-user` (see `platform/logging/helm/fluent-bit-values.yaml` in the GitOps repo).
 
 **Does Jaeger use TLS to Elasticsearch?**
-Yes. `https://traces-es-http.tracing.svc:9200` with the CA file and `jaeger-user` (see `k8s/observability/tracing/jaeger-values.yaml`).
+Yes. `https://traces-es-http.tracing.svc:9200` with the CA file and `jaeger-user` (see `platform/tracing/helm/jaeger-values.yaml` in the GitOps repo).
 
 **Then why does `tracing` join the mesh?**
 Because Jaeger's **own** ports are plain HTTP: the backend sends spans to `http://jaeger...:4318`, and Grafana reads traces from `http://jaeger...:16686`. Only the Jaeger → Elasticsearch hop had TLS.

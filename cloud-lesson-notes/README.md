@@ -14,6 +14,7 @@ Notes written while learning how this project works on AWS. Read them in this or
 | 8 | [Grafana for metrics, logs and traces](grafana-metrics-logs-traces.md) | Grafana as the one UI: which backend each signal comes from, why traces go through Jaeger, the two Elasticsearch databases, users, and sharing the CA with trust-manager. |
 | 9 | [Pod-to-pod traffic: Services, kube-proxy and ztunnel](pod-to-pod-traffic-service-and-ztunnel.md) | How a Service and kube-proxy pick a pod, and how Istio ambient mode does the same with ztunnel: the redirect rule, the sockets inside every pod, and the encrypted tunnel. |
 | 10 | [What is inside the mesh, and why](what-is-inside-the-mesh.md) | Which namespaces join the mesh and which stay out, which connections already have their own TLS, and the interview answer. |
+| 11 | [Secrets with AWS Secrets Manager and ESO](secrets-with-aws-secrets-manager-and-eso.md) | How ESO copies passwords from AWS Secrets Manager into Kubernetes Secrets: who reads what, every ExternalSecret field, Pod Identity, and all the secrets in this project. |
 
 Other how-to notes live next to the code they describe:
 

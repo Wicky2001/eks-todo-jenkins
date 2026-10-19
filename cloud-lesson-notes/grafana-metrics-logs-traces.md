@@ -117,7 +117,7 @@ Grafana's Jaeger data source uses plain HTTP inside the cluster (`jaeger.tracing
 
 ## The data sources in Grafana
 
-From [`k8s/observability/monitoring/helm-values.yaml`](../k8s/observability/monitoring/helm-values.yaml):
+From [`platform/monitoring/helm/helm-values.yaml`](https://github.com/Wicky2001/eks-todo-jenkins-gitops/blob/main/platform/monitoring/helm/helm-values.yaml) in the GitOps repo:
 
 | Data source | `uid` | Talks to |
 |---|---|---|
