@@ -44,3 +44,10 @@ variable "grafana_github_client_secret" {
   type      = string
   sensitive = true
 }
+
+# Alert emails (Alertmanager)
+variable "alert_email_password" {
+  description = "Gmail app password Alertmanager uses to send alert emails"
+  type        = string
+  sensitive   = true
+}
