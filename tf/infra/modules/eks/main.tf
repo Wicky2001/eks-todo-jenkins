@@ -1,3 +1,6 @@
+###############################################################################
+# EBS CSI driver IAM role
+###############################################################################
 # IAM role for the EBS CSI driver (Pod Identity), used by the aws-ebs-csi-driver add-on below
 module "aws_ebs_csi_pod_identity" {
   source = "terraform-aws-modules/eks-pod-identity/aws"
@@ -11,7 +14,11 @@ module "aws_ebs_csi_pod_identity" {
   }
 }
 
+###############################################################################
 # EKS cluster
+###############################################################################
+# Control plane, the add-on node group, and the EKS managed add-ons (CoreDNS,
+# VPC CNI, EBS CSI driver, ...).
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "21.23.0"

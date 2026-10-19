@@ -1,3 +1,7 @@
+###############################################################################
+# VPC
+###############################################################################
+# Subnets, the NAT gateway, and the tags the LB controller and Karpenter look for.
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "6.6.1"

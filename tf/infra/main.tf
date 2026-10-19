@@ -1,3 +1,7 @@
+###############################################################################
+# Terraform settings
+###############################################################################
+# Provider versions, and where the state is kept.
 terraform {
   # State is kept in S3 (bucket created by tf/statebucket). use_lockfile stops two
   # applies from running at the same time.
@@ -35,13 +39,24 @@ terraform {
   }
 }
 
+###############################################################################
+# AWS provider
+###############################################################################
+# Uses the terraform-user profile from ~/.aws/credentials.
 provider "aws" {
   region  = var.region
   profile = var.aws_profile
 }
 
+###############################################################################
+# Current AWS account
+###############################################################################
+# Gives the account ID (see the account_id output).
 data "aws_caller_identity" "current" {}
 
+###############################################################################
+# Kubernetes provider
+###############################################################################
 # The kubernetes, helm and kubectl providers log in to the cluster with a short-lived
 # token from `aws eks get-token` (needs the AWS CLI on this machine). The CA certificate
 # makes sure we are talking to our own cluster.
@@ -56,6 +71,10 @@ provider "kubernetes" {
   }
 }
 
+###############################################################################
+# Helm provider
+###############################################################################
+# Logs in to the cluster the same way as the kubernetes provider.
 provider "helm" {
   kubernetes = {
     host                   = module.eks.cluster_endpoint
@@ -69,6 +88,9 @@ provider "helm" {
   }
 }
 
+###############################################################################
+# kubectl provider
+###############################################################################
 # kubectl provider: applies plain YAML files (NodePool, HTTPRoutes, ...)
 provider "kubectl" {
   apply_retry_count      = 5
@@ -83,6 +105,10 @@ provider "kubectl" {
   }
 }
 
+###############################################################################
+# VPC
+###############################################################################
+# Public, private and intra subnets in two zones, and one NAT gateway.
 module "vpc" {
   source = "./modules/vpc"
 
@@ -90,6 +116,10 @@ module "vpc" {
   region       = var.region
 }
 
+###############################################################################
+# EKS cluster
+###############################################################################
+# The cluster, the add-on node group and the EKS managed add-ons.
 module "eks" {
   source = "./modules/eks"
 
@@ -99,6 +129,10 @@ module "eks" {
   intra_subnets   = module.vpc.intra_subnets
 }
 
+###############################################################################
+# Karpenter
+###############################################################################
+# Starts and removes worker nodes for the pods.
 module "karpenter" {
   source = "./modules/karpenter"
 
@@ -108,6 +142,9 @@ module "karpenter" {
 
 # Cluster add-ons, one module each. EKS-managed add-ons (CoreDNS, EBS CSI, ...) are in the eks module.
 
+###############################################################################
+# AWS Load Balancer Controller
+###############################################################################
 # AWS Load Balancer Controller: turns LoadBalancer Services into NLBs
 module "aws_addons" {
   source = "./modules/aws-addons"
@@ -119,18 +156,29 @@ module "aws_addons" {
   depends_on = [module.eks]
 }
 
+###############################################################################
+# metrics-server
+###############################################################################
+# CPU and memory numbers for kubectl top and the HPAs.
 module "metrics_server" {
   source = "./modules/metrics-server"
 
   depends_on = [module.eks]
 }
 
+###############################################################################
+# Sealed Secrets
+###############################################################################
+# Turns SealedSecret objects into normal Secrets (nothing uses it right now).
 module "sealed_secrets" {
   source = "./modules/sealed-secrets"
 
   depends_on = [module.eks]
 }
 
+###############################################################################
+# Gateway API CRDs
+###############################################################################
 # Gateway API CRDs (Gateway, HTTPRoute, ...). Not built into Kubernetes.
 module "gateway_api_crds" {
   source = "./modules/gateway-api-crds"
@@ -138,6 +186,9 @@ module "gateway_api_crds" {
   depends_on = [module.eks]
 }
 
+###############################################################################
+# cert-manager
+###############################################################################
 # cert-manager writes temporary HTTPRoutes for the Let's Encrypt check,
 # so the Gateway API CRDs must exist before it starts
 module "cert_manager" {
@@ -148,6 +199,9 @@ module "cert_manager" {
   depends_on = [module.gateway_api_crds]
 }
 
+###############################################################################
+# Istio
+###############################################################################
 # Istio + main-gateway (the front door). The gateway needs cert-manager for its
 # certificates and the AWS Load Balancer Controller for its NLB.
 module "istio" {
@@ -156,12 +210,20 @@ module "istio" {
   depends_on = [module.gateway_api_crds, module.cert_manager, module.aws_addons]
 }
 
+###############################################################################
+# ECR repositories
+###############################################################################
+# Where Jenkins pushes the frontend, backend and migration images.
 module "ecr" {
   source = "./modules/ecr"
 
   project_name = var.project_name
 }
 
+###############################################################################
+# App namespace
+###############################################################################
+# The todo app runs here. Argo CD deploys into it.
 resource "kubernetes_namespace_v1" "app" {
   metadata {
     name = "app"
@@ -174,6 +236,10 @@ resource "kubernetes_namespace_v1" "app" {
   depends_on = [module.eks]
 }
 
+###############################################################################
+# RDS database
+###############################################################################
+# PostgreSQL for the backend, with IAM login instead of a password.
 module "rds" {
   source = "./modules/rds"
 
@@ -185,6 +251,10 @@ module "rds" {
   app_namespace          = kubernetes_namespace_v1.app.metadata[0].name
 }
 
+###############################################################################
+# Argo CD
+###############################################################################
+# Installs Argo CD and the bootstrap app.
 # Modules with an HTTPRoute wait for main-gateway (in the istio module).
 module "argocd" {
   source = "./modules/argocd"
@@ -194,36 +264,43 @@ module "argocd" {
   github_client_id     = var.argocd_github_client_id
   github_client_secret = var.argocd_github_client_secret
 
-  depends_on = [module.istio]
+  # The bootstrap app creates the monitoring, logging and tracing cards, so first Terraform
+  # creates what those cards need: their namespaces and operators (observability_base)
+  # and ESO with the passwords in AWS Secrets Manager (secrets).
+  depends_on = [module.istio, module.observability_base, module.secrets]
 }
 
-module "monitoring" {
-  source = "./modules/monitoring"
+###############################################################################
+# Observability base
+###############################################################################
+# Namespaces for monitoring, logging and tracing, and the ECK and trust-manager operators.
+# The stacks themselves are installed by Argo CD.
+module "observability_base" {
+  source = "./modules/observability-base"
 
-  # Grafana reads logs as grafana-user, created in the logging module
-  grafana_es_password = module.logging.grafana_es_password
-
-  # log in with GitHub
-  github_org           = var.github_org
-  github_client_id     = var.grafana_github_client_id
-  github_client_secret = var.grafana_github_client_secret
-
-  # also waits for logging, so the Elasticsearch CA copy exists before Grafana starts
-  depends_on = [module.istio, module.logging]
+  # trust-manager needs cert-manager, the operators need Karpenter nodes to run on, and
+  # two of the namespaces join the mesh (istio)
+  depends_on = [module.cert_manager, module.karpenter, module.istio]
 }
 
-module "logging" {
-  source = "./modules/logging"
+###############################################################################
+# Secrets
+###############################################################################
+# Passwords in AWS Secrets Manager, and ESO (External Secrets Operator), which copies them
+# into Kubernetes Secrets for the stacks (ExternalSecrets in the GitOps repo)
+module "secrets" {
+  source = "./modules/secrets"
 
-  # trust-manager needs cert-manager. Elasticsearch needs the EBS CSI driver
-  # (eks module) and Karpenter nodes to run on.
-  depends_on = [module.cert_manager, module.karpenter]
-}
+  cluster_name = module.eks.cluster_name
+  region       = var.region
 
-module "tracing" {
-  source = "./modules/tracing"
+  github_org                   = var.github_org
+  grafana_github_client_id     = var.grafana_github_client_id
+  grafana_github_client_secret = var.grafana_github_client_secret
 
-  # uses the ECK operator and the elasticsearch-sc storage class from logging.
-  # Waits for istio too, because its namespace joins the mesh.
-  depends_on = [module.logging, module.istio]
+  # Alertmanager sends alert emails with this Gmail app password
+  alert_email_password = var.alert_email_password
+
+  # ESO runs on Karpenter nodes
+  depends_on = [module.eks, module.karpenter]
 }

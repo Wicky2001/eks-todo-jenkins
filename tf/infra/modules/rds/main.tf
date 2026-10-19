@@ -1,13 +1,23 @@
 # PostgreSQL on RDS
 
+###############################################################################
+# Current AWS account
+###############################################################################
+# Account ID, used in the IAM policy below.
 data "aws_caller_identity" "current" {}
 
+###############################################################################
+# DB subnet group
+###############################################################################
 # private subnets in two zones, so the database can't be reached from the internet
 resource "aws_db_subnet_group" "this" {
   name       = "${var.cluster_name}-postgres"
   subnet_ids = var.private_subnets
 }
 
+###############################################################################
+# Database security group
+###############################################################################
 # only the EKS worker nodes can reach port 5432
 resource "aws_security_group" "rds" {
   name        = "${var.cluster_name}-postgres"
@@ -15,6 +25,10 @@ resource "aws_security_group" "rds" {
   vpc_id      = var.vpc_id
 }
 
+###############################################################################
+# Allow the nodes
+###############################################################################
+# Port 5432 from the EKS node security group.
 resource "aws_vpc_security_group_ingress_rule" "from_nodes" {
   security_group_id            = aws_security_group.rds.id
   referenced_security_group_id = var.node_security_group_id
@@ -24,6 +38,10 @@ resource "aws_vpc_security_group_ingress_rule" "from_nodes" {
   description                  = "PostgreSQL from the EKS worker nodes"
 }
 
+###############################################################################
+# PostgreSQL database
+###############################################################################
+# db.t3.micro, single zone, IAM login turned on.
 resource "aws_db_instance" "this" {
   identifier     = "${var.cluster_name}-postgres"
   engine         = "postgres"
@@ -58,6 +76,9 @@ resource "aws_db_instance" "this" {
   deletion_protection = false
 }
 
+###############################################################################
+# Backend IAM role
+###############################################################################
 # IAM role for the backend pod (Pod Identity). It can only get a login token for the
 # app's database user on this database, and only pods using the backend ServiceAccount get it.
 module "backend_pod_identity" {
@@ -85,6 +106,9 @@ module "backend_pod_identity" {
   }
 }
 
+###############################################################################
+# Database settings for the pods
+###############################################################################
 # Database address for the backend and migration pods (only known once RDS exists)
 resource "kubernetes_config_map_v1" "backend_db" {
   metadata {

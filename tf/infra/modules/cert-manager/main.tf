@@ -1,3 +1,6 @@
+###############################################################################
+# cert-manager
+###############################################################################
 # cert-manager: gets Let's Encrypt certificates for the gateway and renews them
 resource "helm_release" "cert_manager" {
   name             = "cert-manager"
@@ -30,6 +33,9 @@ resource "helm_release" "cert_manager" {
 
 # Let's Encrypt issuers. templatefile fills in your email (from terraform.tfvars).
 
+###############################################################################
+# Let's Encrypt staging issuer
+###############################################################################
 # staging: for testing, browsers don't trust it
 resource "kubectl_manifest" "letsencrypt_staging" {
   yaml_body = templatefile("${path.root}/../../k8s/cert-manager/letsencrypt-staging.yaml", { email = var.letsencrypt_email })
@@ -37,6 +43,9 @@ resource "kubectl_manifest" "letsencrypt_staging" {
   depends_on = [helm_release.cert_manager]
 }
 
+###############################################################################
+# Let's Encrypt prod issuer
+###############################################################################
 # prod: real, trusted certificates
 resource "kubectl_manifest" "letsencrypt_prod" {
   yaml_body = templatefile("${path.root}/../../k8s/cert-manager/letsencrypt-prod.yaml", { email = var.letsencrypt_email })

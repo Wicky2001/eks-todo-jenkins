@@ -1,0 +1,21 @@
+# Argo CD project "bootstrap": only for the bootstrap app (bootstrap-app.yaml).
+# Every Argo CD app must belong to a project. This one allows exactly what the bootstrap
+# app does: read the GitOps repo and create Argo CD projects and apps in the argocd namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: bootstrap
+  # Argo CD keeps all its projects and apps in its own namespace
+  namespace: argocd
+spec:
+  description: "Only for the bootstrap app, which creates the other projects and apps from Git"
+  sourceRepos:
+    - https://github.com/Wicky2001/eks-todo-jenkins-gitops.git
+  destinations:
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+  namespaceResourceWhitelist:
+    - group: argoproj.io
+      kind: AppProject
+    - group: argoproj.io
+      kind: Application

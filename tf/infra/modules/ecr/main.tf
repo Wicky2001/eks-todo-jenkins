@@ -1,20 +1,35 @@
 # ECR repositories for the app images
 
+###############################################################################
+# Frontend repository
+###############################################################################
+# Frontend images.
 resource "aws_ecr_repository" "frontend" {
   name         = "${var.project_name}-frontend"
   force_delete = true
 }
 
+###############################################################################
+# Backend repository
+###############################################################################
+# Backend images.
 resource "aws_ecr_repository" "backend" {
   name         = "${var.project_name}-backend"
   force_delete = true
 }
 
+###############################################################################
+# Migration repository
+###############################################################################
+# Database migration images.
 resource "aws_ecr_repository" "migration" {
   name         = "${var.project_name}-migration"
   force_delete = true
 }
 
+###############################################################################
+# Keep the last 10 images
+###############################################################################
 # Every commit pushes a new image, so keep only the latest 10 per repo
 # to stop ECR storage costs from growing forever.
 resource "aws_ecr_lifecycle_policy" "keep_last_10" {
@@ -40,6 +55,9 @@ resource "aws_ecr_lifecycle_policy" "keep_last_10" {
   })
 }
 
+###############################################################################
+# Jenkins IAM user (not used)
+###############################################################################
 # IAM user with ECR push rights. Not used any more: Jenkins runs on EC2 and uses its
 # instance role. If you ever need access keys for it, create them in the console,
 # not here, so they don't end up in the Terraform state.
@@ -47,6 +65,10 @@ resource "aws_iam_user" "jenkins" {
   name = "${var.project_name}-jenkins"
 }
 
+###############################################################################
+# Jenkins ECR push policy
+###############################################################################
+# Lets that user push to the three app repositories.
 resource "aws_iam_user_policy" "jenkins_ecr_push" {
   name = "ecr-push"
   user = aws_iam_user.jenkins.name

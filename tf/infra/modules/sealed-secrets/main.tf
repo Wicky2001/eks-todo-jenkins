@@ -1,3 +1,6 @@
+###############################################################################
+# Sealed Secrets
+###############################################################################
 # sealed-secrets: decrypts SealedSecret objects into normal Secrets inside the cluster
 resource "helm_release" "sealed_secrets" {
   name             = "sealed-secrets"

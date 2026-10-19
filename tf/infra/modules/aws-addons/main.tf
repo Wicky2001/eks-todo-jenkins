@@ -1,5 +1,8 @@
 # AWS add-ons that run inside the cluster
 
+###############################################################################
+# Load Balancer Controller IAM role
+###############################################################################
 # IAM role for the AWS Load Balancer Controller (Pod Identity)
 module "aws_lb_controller_pod_identity" {
   source = "terraform-aws-modules/eks-pod-identity/aws"
@@ -21,6 +24,9 @@ module "aws_lb_controller_pod_identity" {
   }
 }
 
+###############################################################################
+# AWS Load Balancer Controller
+###############################################################################
 # Creates the NLB for Services of type LoadBalancer (the Istio gateway Service)
 resource "helm_release" "aws_load_balancer_controller" {
   name       = "aws-load-balancer-controller"

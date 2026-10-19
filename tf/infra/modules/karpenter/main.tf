@@ -1,3 +1,6 @@
+###############################################################################
+# Karpenter AWS resources
+###############################################################################
 # IAM roles, SQS interruption queue and Pod Identity for Karpenter
 module "karpenter" {
   source  = "terraform-aws-modules/eks/aws//modules/karpenter"
@@ -14,6 +17,10 @@ module "karpenter" {
   }
 }
 
+###############################################################################
+# Karpenter
+###############################################################################
+# The Karpenter controller.
 resource "helm_release" "karpenter" {
   namespace  = "kube-system"
   name       = "karpenter"
@@ -41,6 +48,10 @@ resource "helm_release" "karpenter" {
   depends_on = [module.karpenter]
 }
 
+###############################################################################
+# Node pool
+###############################################################################
+# Which instance types Karpenter may start, and when it removes nodes.
 resource "kubectl_manifest" "karpenter_node_pool" {
   yaml_body = file("${path.root}/../../k8s/karpenter/karpenter-node-pool.yaml")
 
@@ -49,6 +60,10 @@ resource "kubectl_manifest" "karpenter_node_pool" {
   ]
 }
 
+###############################################################################
+# Node class
+###############################################################################
+# How the nodes are built: AMI, subnets, security groups and node role.
 resource "kubectl_manifest" "karpenter_node_class" {
   yaml_body = templatefile("${path.root}/../../k8s/karpenter/karpenter-node-class.yaml", {
     cluster_name = var.cluster_name
@@ -59,6 +74,9 @@ resource "kubectl_manifest" "karpenter_node_class" {
   ]
 }
 
+###############################################################################
+# Inflate test deployment
+###############################################################################
 # test deployment for Karpenter scaling (scale it up to see new nodes)
 resource "kubectl_manifest" "inflate_deployment" {
   yaml_body = file("${path.root}/../../k8s/inflate/inflate-deployment.yaml")

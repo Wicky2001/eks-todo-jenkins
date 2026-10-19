@@ -1,0 +1,30 @@
+# The bootstrap app: the only app Terraform creates. It applies every file in the GitOps
+# repo's argocd/ folder (and its subfolders):
+#   argocd/projects/  the apps and platform projects (first, sync wave -1)
+#   argocd/apps/      the backend and frontend cards
+#   argocd/platform/  the monitoring, logging and tracing cards
+# A new card or project = a new file there, no Terraform change.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bootstrap
+  namespace: argocd
+  # deleting this app also deletes the projects and cards it created (and what they deployed)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: bootstrap
+  source:
+    repoURL: https://github.com/Wicky2001/eks-todo-jenkins-gitops.git
+    targetRevision: main
+    path: argocd
+    directory:
+      recurse: true
+  # the projects and apps it creates are stored in the argocd namespace
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
