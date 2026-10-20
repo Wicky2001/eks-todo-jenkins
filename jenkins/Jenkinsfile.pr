@@ -1,4 +1,16 @@
+def scanImage(String image) {
+    sh """
+        trivy image --severity HIGH,CRITICAL --no-progress ${image}
+        trivy image --severity CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --no-progress --quiet ${image}
+    """
+}
 
+def scanConfig(String folder) {
+    sh """
+        trivy config --severity HIGH,CRITICAL ${folder}
+        trivy config --severity CRITICAL --exit-code 1 --quiet ${folder}
+    """
+}
 
 pipeline {
     agent { label 'docker' }
@@ -42,6 +54,20 @@ pipeline {
             }
         }
 
+    
+        stage('IaC scan: Terraform (Trivy)') {
+            steps {
+                scanConfig('tf/')
+            }
+        }
+
+        stage('IaC scan: Kubernetes (Trivy)') {
+            when { changeset "k8s/**" }
+            steps {
+                scanConfig('k8s/')
+            }
+        }
+
         stage('SonarCloud Analysis') {
             steps {
 
@@ -60,18 +86,21 @@ pipeline {
         stage('Build backend image') {
             steps {
                 sh 'docker build -f backend/Dockerfile -t eks-todo-backend:$IMG_TAG .'
+                scanImage("eks-todo-backend:${env.IMG_TAG}")
             }
         }
 
         stage('Build frontend image') {
             steps {
                 sh 'docker build -f frontend/Dockerfile --build-arg VITE_API_URL="" -t eks-todo-frontend:$IMG_TAG .'
+                scanImage("eks-todo-frontend:${env.IMG_TAG}")
             }
         }
 
         stage('Build migration image') {
             steps {
                 sh 'docker build -f migration/Dockerfile -t eks-todo-migration:$IMG_TAG .'
+                scanImage("eks-todo-migration:${env.IMG_TAG}")
             }
         }
     }
