@@ -1,0 +1,6 @@
+# Trivy findings we have checked and accept. Trivy reads this file automatically.
+# One ID per line (a CVE for images, an AVD-... or KSV-... ID for Terraform/Kubernetes),
+# with a comment saying why it is safe to ignore, for example:
+#
+#   # no fix yet, and the vulnerable function is not used by the backend
+#   CVE-2026-12345
