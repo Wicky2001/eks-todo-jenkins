@@ -12,6 +12,11 @@ def scanConfig(String folder) {
     """
 }
 
+
+def changed(String folder) {
+    return ("\n" + env.CHANGED_FILES).contains("\n" + folder)
+}
+
 pipeline {
     agent { label 'docker' }
 
@@ -64,6 +69,25 @@ pipeline {
             }
         }
 
+        // Find files changed since the last successful build.
+        // If no previous successful commit exists, or it is unavailable,
+        // treat all tracked files as changed.
+        stage('Find changed files') {
+            steps {
+                script {
+                    env.CHANGED_FILES = sh(returnStdout: true, script: '''
+                        if [ -n "$GIT_PREVIOUS_SUCCESSFUL_COMMIT" ] && git cat-file -e "${GIT_PREVIOUS_SUCCESSFUL_COMMIT}^{commit}" 2>/dev/null; then
+                            git diff --name-only "$GIT_PREVIOUS_SUCCESSFUL_COMMIT" "$GIT_COMMIT"
+                        else
+                            git ls-files
+                        fi
+                    ''').trim()
+                    echo "Changed files:\n${env.CHANGED_FILES}"
+                }
+            }
+        }
+
+
         stage('Secret scan (gitleaks)') {
             steps {
                 sh '''
@@ -88,7 +112,7 @@ pipeline {
 
 
         stage('IaC scan: Terraform (Trivy)') {
-            when { changeset "tf/**" }
+            when { expression { changed('tf/') } }
             steps {
                 scanConfig('tf/')
             }
@@ -96,7 +120,7 @@ pipeline {
 
 
         stage('IaC scan: Kubernetes (Trivy)') {
-            when { changeset "k8s/**" }
+            when { expression { changed('k8s/') } }
             steps {
                 scanConfig('k8s/')
             }
@@ -125,13 +149,7 @@ pipeline {
         // }
 
         stage('Login to ECR') {
-            when {
-                anyOf {
-                    changeset "backend/**"
-                    changeset "frontend/**"
-                    changeset "migration/**"
-                }
-            }
+            when { expression { changed('backend/') || changed('frontend/') || changed('migration/') } }
             steps {
                 // The AWS CLI uses the EC2 instance role's temporary keys,
                 // gets a temporary ECR password and pipes it into 'docker login'.
@@ -141,7 +159,7 @@ pipeline {
 
 
         stage('Backend') {
-            when { changeset "backend/**" }
+            when { expression { changed('backend/') } }
             environment {
                 IMAGE = "${ECR_REGISTRY}/eks-todo-backend:${IMAGE_TAG}"
             }
@@ -158,7 +176,7 @@ pipeline {
         }
 
         stage('Frontend') {
-            when { changeset "frontend/**" }
+            when { expression { changed('frontend/') } }
             environment {
                 IMAGE = "${ECR_REGISTRY}/eks-todo-frontend:${IMAGE_TAG}"
             }
@@ -180,7 +198,7 @@ pipeline {
         }
 
         stage('Migration') {
-            when { changeset "migration/**" }
+            when { expression { changed('migration/') } }
             environment {
                 IMAGE = "${ECR_REGISTRY}/eks-todo-migration:${IMAGE_TAG}"
             }
