@@ -1,7 +1,7 @@
 # ============================================================
 #  Dockerfile.agent
 #  The Jenkins build agent that runs the pipelines. Includes:
-#  Docker CLI, SonarScanner, AWS CLI v2 and gitleaks.
+#  Docker CLI, SonarScanner, AWS CLI v2, gitleaks and Trivy.
 # ============================================================
 FROM jenkins/inbound-agent:latest
 
@@ -38,6 +38,25 @@ RUN ARCH="$(uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/')" \
     && tar -xzf "${FILE}" -C /usr/local/bin gitleaks \
     && rm -f /tmp/gitleaks_* \
     && gitleaks version
+
+# Install Trivy (scans images, Terraform and Kubernetes files).
+# Trivy's own releases were hijacked in March 2026 (v0.69.4 and fake v0.69.5/v0.69.6
+# images), so the version is pinned and the SHA-256 is written here, not downloaded:
+# if the release file is ever swapped, the check fails and the build stops.
+ARG TRIVY_VERSION=0.75.0
+ARG TRIVY_SHA256_AMD64=c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+ARG TRIVY_SHA256_ARM64=a1ee9f6ffb7d112b64ff726a2a0717c21175c1114361391f4a132956751a13b3
+RUN case "$(uname -m)" in \
+      x86_64)  ARCH=64bit; SHA="${TRIVY_SHA256_AMD64}" ;; \
+      aarch64) ARCH=ARM64; SHA="${TRIVY_SHA256_ARM64}" ;; \
+    esac \
+    && FILE="trivy_${TRIVY_VERSION}_Linux-${ARCH}.tar.gz" \
+    && cd /tmp \
+    && curl -sSLO "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${FILE}" \
+    && echo "${SHA}  ${FILE}" | sha256sum -c - \
+    && tar -xzf "${FILE}" -C /usr/local/bin trivy \
+    && rm -f "/tmp/${FILE}" \
+    && trivy --version
 
 # Let the agent's 'jenkins' user use the Docker socket (match host GID)
 ARG DOCKER_GID=999
