@@ -1,11 +1,16 @@
-// ============================================================
-//  Jenkinsfile.deploy
-//  1) Build + push only the services whose folder changed, to ECR,
-//     tagged with the full git commit SHA (never 'latest').
-//  2) Write the new tag into the Kubernetes manifests in the GitOps repo
-//     (eks-todo-jenkins-gitops) and push it. Argo CD watches that repo
-//     and deploys the change. This repo only holds the source code.
-// ============================================================
+def scanImage(String image) {
+    sh """
+        trivy image --severity HIGH,CRITICAL --no-progress ${image}
+        trivy image --severity CRITICAL --ignore-unfixed --exit-code 1 --skip-db-update --no-progress --quiet ${image}
+    """
+}
+
+def scanConfig(String folder) {
+    sh """
+        trivy config --severity HIGH,CRITICAL ${folder}
+        trivy config --severity CRITICAL --exit-code 1 --quiet ${folder}
+    """
+}
 
 pipeline {
     agent { label 'docker' }
@@ -59,11 +64,6 @@ pipeline {
             }
         }
 
-        // Stops the deploy if a pushed commit adds a secret, before any image is built.
-        // gitleaks is installed in the agent image (jenkins/images/Dockerfile.agent).
-        // It scans the commits since the last successful deploy. On the very first build
-        // there is no previous commit, so it scans the whole history (known old findings
-        // are listed in .gitleaksignore).
         stage('Secret scan (gitleaks)') {
             steps {
                 sh '''
@@ -86,12 +86,43 @@ pipeline {
             }
         }
 
-        stage('Debug: Check IAM role') {
+
+        stage('IaC scan: Terraform (Trivy)') {
+            when { changeset "tf/**" }
             steps {
-                sh 'aws sts get-caller-identity'
+                scanConfig('tf/')
             }
         }
 
+
+        stage('IaC scan: Kubernetes (Trivy)') {
+            when { changeset "k8s/**" }
+            steps {
+                scanConfig('k8s/')
+            }
+        }
+
+
+        stage('SonarCloud Analysis') {
+            steps {
+
+                withSonarQubeEnv('SonarCloud') {
+                    sh '''
+                        docker run --rm \
+                          -e SONAR_HOST_URL="$SONAR_HOST_URL" \
+                          -e SONAR_TOKEN="$SONAR_AUTH_TOKEN" \
+                          -v "$PWD:/usr/src" \
+                          sonarsource/sonar-scanner-cli
+                    '''
+                }
+            }
+        }
+
+        // stage('Debug: Check IAM role') {
+        //     steps {
+        //         sh 'aws sts get-caller-identity'
+        //     }
+        // }
 
         stage('Login to ECR') {
             when {
@@ -108,6 +139,7 @@ pipeline {
             }
         }
 
+
         stage('Backend') {
             when { changeset "backend/**" }
             environment {
@@ -115,6 +147,8 @@ pipeline {
             }
             steps {
                 sh 'docker build -f backend/Dockerfile -t $IMAGE .'
+                // scanned before the push, so a vulnerable image never reaches ECR
+                scanImage(env.IMAGE)
                 sh 'docker push $IMAGE'
                 script { env.CHANGED_SERVICES = (env.CHANGED_SERVICES ?: '') + ' backend' }
             }
@@ -136,6 +170,7 @@ pipeline {
                       -t $IMAGE \
                       .
                 '''
+                scanImage(env.IMAGE)
                 sh 'docker push $IMAGE'
                 script { env.CHANGED_SERVICES = (env.CHANGED_SERVICES ?: '') + ' frontend' }
             }
@@ -151,6 +186,7 @@ pipeline {
             }
             steps {
                 sh 'docker build -f migration/Dockerfile -t $IMAGE .'
+                scanImage(env.IMAGE)
                 sh 'docker push $IMAGE'
                 script { env.CHANGED_SERVICES = (env.CHANGED_SERVICES ?: '') + ' migration' }
             }
@@ -158,6 +194,9 @@ pipeline {
                 always { sh 'docker image rm $IMAGE || true' }
             }
         }
+
+
+
 
         stage('Update Kubernetes manifests') {
             when { expression { env.CHANGED_SERVICES != null } }
