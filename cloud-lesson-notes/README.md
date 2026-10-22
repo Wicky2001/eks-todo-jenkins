@@ -15,6 +15,7 @@ Notes written while learning how this project works on AWS. Read them in this or
 | 9 | [Pod-to-pod traffic: Services, kube-proxy and ztunnel](pod-to-pod-traffic-service-and-ztunnel.md) | How a Service and kube-proxy pick a pod, and how Istio ambient mode does the same with ztunnel: the redirect rule, the sockets inside every pod, and the encrypted tunnel. |
 | 10 | [What is inside the mesh, and why](what-is-inside-the-mesh.md) | Which namespaces join the mesh and which stay out, which connections already have their own TLS, and the interview answer. |
 | 11 | [Secrets with AWS Secrets Manager and ESO](secrets-with-aws-secrets-manager-and-eso.md) | How ESO copies passwords from AWS Secrets Manager into Kubernetes Secrets: who reads what, every ExternalSecret field, Pod Identity, and all the secrets in this project. |
+| 12 | [Jenkins and GitHub: a GitHub App for PR checks and webhooks](jenkins-github-app.md) | Why only the Sonar check showed up, the two directions (webhook in, app out), creating and installing the app, permissions, how Jenkins logs in with the private key, fixing the ruleset, changing IPs, and using one app for both directions. |
 
 Other how-to notes live next to the code they describe:
 
