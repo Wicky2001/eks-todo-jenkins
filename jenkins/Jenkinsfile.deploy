@@ -235,7 +235,7 @@ pipeline {
                      do
                       case "$svc" in
                         backend)   
-                            file=backend/deployment.yaml 
+                            file=backend/rollout.yaml 
                             ;;
                         frontend)  
                             file=frontend/deployment.yaml 
