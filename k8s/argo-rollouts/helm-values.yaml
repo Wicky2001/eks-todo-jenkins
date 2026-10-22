@@ -1,0 +1,16 @@
+# Values for the argo-rollouts Helm chart (installed by tf/infra/modules/argo-rollouts).
+
+controller:
+  # run on the system nodes, like the other operators
+  tolerations:
+    - key: CriticalAddonsOnly
+      operator: Exists
+      effect: NoSchedule
+
+  # Our routes are Gateway API HTTPRoutes, which Argo Rollouts can't edit by itself.
+  # This plugin teaches it how to change the weights in an HTTPRoute (90/10, 50/50, ...).
+  # The controller downloads the plugin file when it starts. The sha256 makes it refuse
+  trafficRouterPlugins:
+    - name: argoproj-labs/gatewayAPI
+      location: https://github.com/argoproj-labs/rollouts-plugin-trafficrouter-gatewayapi/releases/download/v0.17.0/gatewayapi-plugin-linux-amd64
+      sha256: 1904ca787d33107c140521899d61fff030ee75d99908bd175fca5a4647759061

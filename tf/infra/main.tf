@@ -211,6 +211,17 @@ module "istio" {
 }
 
 ###############################################################################
+# Argo Rollouts
+###############################################################################
+# The controller that runs canary releases (the backend is a Rollout, not a Deployment).
+# It edits HTTPRoute weights, so the Gateway API CRDs must exist first.
+module "argo_rollouts" {
+  source = "./modules/argo-rollouts"
+
+  depends_on = [module.gateway_api_crds]
+}
+
+###############################################################################
 # ECR repositories
 ###############################################################################
 # Where Jenkins pushes the frontend, backend and migration images.
@@ -267,7 +278,8 @@ module "argocd" {
   # The bootstrap app creates the monitoring, logging and tracing cards, so first Terraform
   # creates what those cards need: their namespaces and operators (observability_base)
   # and ESO with the passwords in AWS Secrets Manager (secrets).
-  depends_on = [module.istio, module.observability_base, module.secrets]
+  # The backend card holds a Rollout, so the Argo Rollouts CRDs must exist too.
+  depends_on = [module.istio, module.observability_base, module.secrets, module.argo_rollouts]
 }
 
 ###############################################################################
