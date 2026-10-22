@@ -1,0 +1,42 @@
+# Test traffic for trying a canary release. Not part of the app: you run it by hand
+# while a canary is in progress, so the judge has real requests to measure.
+#   kubectl apply -f k8s/argo-rollouts/canary-traffic-job.yaml
+#   kubectl delete -f k8s/argo-rollouts/canary-traffic-job.yaml   (to stop it early)
+#
+# It calls the public URL, so every request goes through the gateway and is split by the
+# canary weights (90/10, 50/50, ...), like a real user's request.
+# 5 requests per second for about 15 minutes, then the Job finishes by itself.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: canary-traffic
+  namespace: app
+spec:
+  backoffLimit: 0
+  # delete the finished Job (and its pod) 10 minutes after it ends
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+      containers:
+        - name: curl
+          image: curlimages/curl:8.11.1
+          command: ["/bin/sh", "-c"]
+          # prints each answer's status code, e.g. 200 or 500
+          args:
+            - |
+              i=0
+              while [ $i -lt 4500 ]; do
+                curl -s -o /dev/null -w "%{http_code}\n" https://todo.jawsight.online/api/todos
+                i=$((i+1))
+                sleep 0.2
+              done
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi
