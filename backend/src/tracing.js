@@ -10,6 +10,7 @@ const { BatchSpanProcessor } = require("@opentelemetry/sdk-trace-base");
 const { HttpInstrumentation } = require("@opentelemetry/instrumentation-http");
 const { PgInstrumentation } = require("@opentelemetry/instrumentation-pg");
 const {ExpressInstrumentation} = require("@opentelemetry/instrumentation-express");
+const { PinoInstrumentation } = require("@opentelemetry/instrumentation-pino");
 
 
 const logger = pino();
@@ -68,6 +69,10 @@ try {
       // Only trace database queries that belong to a request (so the readiness
       // "SELECT 1" and the startup connection check don't become traces of their own)
       new PgInstrumentation({ requireParentSpan: true }),
+      // Adds trace_id and span_id to every pino log line written during a request,
+      // so Grafana can show exactly the logs of one trace (and jump from a log to its trace).
+      // Only loggers created after this point get it: server.js loads this file first.
+      new PinoInstrumentation(),
     ],
   });
 
